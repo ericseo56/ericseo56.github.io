@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="trail" x1="0.5" y1="1" x2="0.5" y2="0">
+      <stop offset="0%"   stop-color="#1a5fa8" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#1a5fa8" stop-opacity="0.75"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base ring: full circle, light blue -->
+  <circle cx="16" cy="16" r="11"
+    fill="none" stroke="#a8c8e8" stroke-width="4.5"/>
+
+  <!-- Motion trail: 180° arc fading from bottom up into the head -->
+  <circle cx="16" cy="16" r="11"
+    fill="none" stroke="url(#trail)" stroke-width="4.5"
+    stroke-dasharray="34.56 34.56"
+    stroke-dashoffset="34.56"
+    transform="rotate(-90 16 16)"/>
+
+  <!-- Head: 36° dark arc at top -->
+  <circle cx="16" cy="16" r="11"
+    fill="none" stroke="#0d3d7a" stroke-width="4.5"
+    stroke-dasharray="6.91 62.21"
+    stroke-linecap="round"
+    transform="rotate(-90 16 16)"/>
+</svg>

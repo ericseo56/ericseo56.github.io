@@ -1,3 +1,3 @@
 Website for portfolio, personal projects, etc. Oscilloscope/EE lab feel.
 
-ericseo56.github.io
+The URL is [ericseo56.github.io](ericseo56.github.io) if you wanna check it out.

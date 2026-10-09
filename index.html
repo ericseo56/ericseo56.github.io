@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#182b35">
+  <meta name="description" content="Eric Seo is an Electrical and Computer Engineering student at Cornell University working on embedded hardware, PCB design, and extended reality systems.">
+  <meta property="og:title" content="Eric Seo | Electrical & Computer Engineering">
+  <meta property="og:description" content="Embedded hardware, mixed-signal PCB design, and extended reality systems. Cornell Engineering, Class of 2028.">
+  <meta property="og:type" content="website">
+  <title>Eric Seo | Electrical & Computer Engineering</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <nav class="nav shell" aria-label="Main navigation">
+      <a class="wordmark" href="#top" aria-label="Eric Seo, home">ERIC SEO<span class="wordmark-period">.</span></a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-links" hidden><span class="menu-label">Menu</span><span class="menu-icon" aria-hidden="true"></span></button>
+      <div class="nav-links" id="nav-links">
+        <a href="#projects">Projects</a>
+        <a href="#experience">Experience</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+        <a class="nav-resume" href="assets/eric-seo-resume.pdf" target="_blank" rel="noopener">Resume</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero shell" id="top" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">CORNELL ENGINEERING / CLASS OF 2028</p>
+        <h1 id="hero-title">Eric Seo</h1>
+        <p class="hero-discipline">Electrical &amp;<br>computer engineering.</p>
+        <p class="hero-intro">I build embedded hardware and interactive systems that connect the physical and digital worlds. My work spans mixed-signal PCBs, microcontrollers, and extended reality.</p>
+        <div class="hero-actions"><a class="button" href="#projects">Explore my work</a><a class="text-link" href="mailto:eys39@cornell.edu">Get in touch</a></div>
+      </div>
+      <aside class="profile" aria-label="Profile">
+        <div class="portrait-frame" id="portrait-frame">
+          <img class="portrait" src="assets/profile.jpg" alt="Eric Seo" width="600" height="600" fetchpriority="high" hidden>
+          <div class="portrait-fallback" aria-hidden="true"><span>ES</span><span class="portrait-caption">ERIC SEO / CORNELL ECE</span></div>
+        </div>
+        <div class="profile-caption"><span>Based in Ithaca, New York</span><a href="https://www.linkedin.com/in/eric-seo39/" target="_blank" rel="noopener noreferrer">LinkedIn</a></div>
+      </aside>
+    </section>
+    <div class="focus-strip"><div class="shell focus-inner"><span class="eyebrow">AREAS OF FOCUS</span><span>Embedded systems</span><span>PCB design</span><span>Extended reality</span></div></div>
+
+    <section class="section shell" id="projects" aria-labelledby="projects-title">
+      <div class="section-heading"><p class="eyebrow">01 / SELECTED WORK</p><h2 id="projects-title">From circuits to systems.</h2></div>
+      <article class="project project-featured">
+        <div class="project-meta"><span class="project-number">01</span><span class="eyebrow">CORNELL XR</span><span class="project-date">April 2026 — Present</span></div>
+        <div class="project-body"><p class="project-type">MOTION TRACKING / EMBEDDED CONTROL</p><h3>Omnidirectional<br>treadmill</h3><p class="project-description">A 360-degree platform for moving through virtual worlds. I lead the platform design and develop the electronics and motion-tracking pipeline for closed-loop control.</p><div class="tags" aria-label="Technologies"><span>PCB design</span><span>MCU control</span><span>OpenPose</span><span>Computer vision</span></div>
+        <details><summary>Engineering details</summary><ul><li>Defining mechanical, structural, and user-safety requirements for VR treadmill use.</li><li>Designing a buck-converter PCB and microcontroller system to drive motion from live camera input.</li><li>Developing a CMU OpenPose pipeline for real-time tracking and closed-loop treadmill control.</li></ul></details></div>
+      </article>
+      <article class="project project-secondary">
+        <div class="project-meta"><span class="project-number">02</span><span class="eyebrow">CORNELL MAKEATHON</span><span class="project-date">February 2026</span><span class="award">Best Hardware Winner</span></div>
+        <div class="project-body"><p class="project-type">HAND TRACKING / ACCESSIBILITY</p><h3>DEX<br><span class="project-subtitle">Dextrous Hand</span></h3><p class="project-description">A wearable hand-tracking peripheral for real-time motion sensing and tactile interaction. I built the embedded electronics and sensor firmware to turn hand movement into usable data for rehabilitation and accessibility applications.</p><div class="tags" aria-label="Technologies"><span>ESP32</span><span>9-DOF IMU</span><span>Rotary encoders</span><span>I²C / SPI</span></div>
+        <details><summary>Engineering details</summary><ul><li>Integrated dual rotary encoders, a 9-DOF IMU, and a thumb switch with an ESP32.</li><li>Wrote firmware to read calibrated sensor data and deliver finger-tracking data to a web platform.</li></ul></details></div>
+      </article>
+    </section>
+
+    <section class="experience-section" id="experience" aria-labelledby="experience-title"><div class="section shell">
+      <div class="section-heading"><p class="eyebrow">02 / EXPERIENCE</p><h2 id="experience-title">Engineering in practice.</h2></div>
+      <article class="experience-row"><div class="experience-meta"><p>May — August 2026</p><p>El Segundo, CA</p></div><div class="experience-content"><div class="role-heading"><h3>Picogrid</h3><span>Hardware Intern</span></div><p>Owned end-to-end mixed-signal PCB design for complex 8-layer boards, including controlled-impedance differential routing, signal-integrity analysis, and EMI mitigation.</p><p>Developed and brought up USB-C Power Delivery and STM32-based hardware through rapid prototyping and precision microsoldering. Scoped projects from requirements through prototype.</p></div></article>
+      <article class="experience-row"><div class="experience-meta"><p>January 2025 — Present</p><p>Ithaca, NY</p></div><div class="experience-content"><div class="role-heading"><h3>Cornell University<br>eXtended Reality</h3><span>Full Team Lead</span></div><p>Lead a team of approximately 30 members building VR games, edge detection for Meta glasses, and haptic systems that map digital feedback to physical sensations.</p><p>Program microcontrollers in C/C++, integrate custom hardware with Oculus Quest 2 headsets, and build scent-release systems linked to virtual environments. Hosted information sessions with Valve and General Motors.</p></div></article>
+      <article class="experience-row"><div class="experience-meta"><p>May — August 2025</p><p>Olathe, KS</p></div><div class="experience-content"><div class="role-heading"><h3>Kiewit Power Engineering</h3><span>Power Engineer</span></div><p>Supported electrical systems projects through commissioning and plant closeout. Performed circuit design, cable sizing, and voltage-drop calculations, and maintained one-line diagrams and schematics aligned with field conditions.</p></div></article>
+    </div></section>
+
+    <section class="section shell about-section" id="about" aria-labelledby="about-title">
+      <div class="section-heading"><p class="eyebrow">03 / BACKGROUND</p><h2 id="about-title">Built on fundamentals.</h2></div>
+      <div class="about-grid"><div class="education"><p class="eyebrow">EDUCATION</p><h3>Cornell University</h3><p>College of Engineering</p><p class="degree">B.S. in Electrical and Computer Engineering</p><dl class="education-facts"><div><dt>Expected graduation</dt><dd>May 2028</dd></div><div><dt>GPA</dt><dd>3.69 / 4.00</dd></div></dl></div>
+      <div class="skills"><p class="eyebrow">TECHNICAL TOOLKIT</p><dl><div><dt>Hardware</dt><dd>KiCad, PCB design, EMI analysis, LTspice, STM32, ESP32</dd></div><div><dt>Programming</dt><dd>C, C++, Python, SystemVerilog</dd></div><div><dt>Tools</dt><dd>Git, GitHub, LaTeX</dd></div></dl></div></div>
+      <div class="coursework"><p class="eyebrow">RELEVANT COURSEWORK</p><p>Circuits and Circuit Analysis · Digital Logic &amp; Computer Organization · Microelectronics · Signals and Systems · EM Fields and Waves · Embedded Systems · Linear Algebra · Differential Equations</p></div>
+    </section>
+
+    <section class="contact-section" id="contact" aria-labelledby="contact-title"><div class="shell contact-inner"><div><p class="eyebrow">04 / CONTACT</p><h2 id="contact-title">Let’s connect.</h2><p>For engineering opportunities, project collaborations, or a conversation about hardware.</p></div><div class="contact-links"><a class="contact-email" href="mailto:eys39@cornell.edu">eys39@cornell.edu</a><div><a href="https://www.linkedin.com/in/eric-seo39/" target="_blank" rel="noopener noreferrer">LinkedIn</a><a href="https://github.com/ericseo56" target="_blank" rel="noopener noreferrer">GitHub</a><a href="assets/eric-seo-resume.pdf" target="_blank" rel="noopener">View resume</a></div></div></div></section>
+  </main>
+  <footer class="site-footer shell"><span>© <span id="year">2026</span> Eric Seo</span><span>Electrical &amp; Computer Engineering</span><a href="#top">Back to top</a></footer>
+</body>
+</html>

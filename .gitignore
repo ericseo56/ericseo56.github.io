@@ -1,0 +1,7 @@
+.DS_Store
+Thumbs.db
+node_modules/
+tmp/
+.sites-runtime/
+resume-preview.png
+*.log

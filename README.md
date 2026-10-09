@@ -8,7 +8,7 @@ Run `python -m http.server 8080` from this folder, then open http://localhost:80
 
 ## Editing
 
-- `index.html`: biography, projects, experience, education, and contact links.
+- `index.html`: introduction, projects, experience, and contact links.
 - `styles.css`: responsive layout, typography, and colors.
 - `script.js`: mobile menu, navigation state, and portrait loading.
 - `assets/profile.jpg`: Eric's portrait from the public [Cornell XR team page](https://cornellxr.com/team/). LinkedIn blocked unauthenticated image retrieval.

@@ -24,7 +24,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .hero h1 { font: 400 clamp(52px, 6vw, 72px)/1.1 var(--serif); letter-spacing: -2px; margin: 0 0 24px; }
 .hero-intro { max-width: 620px; margin: 0; font-size: 18px; line-height: 1.85; }
 .hero-blurb { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
-.portrait-frame { --portrait-step: 18px; --portrait-trail: calc(var(--portrait-step) * 3); display: block; width: 100%; position: relative; isolation: isolate; border: 0; background: transparent; padding: var(--portrait-trail) var(--portrait-trail) 0 0; cursor: crosshair; touch-action: manipulation; }
+.portrait-frame { --portrait-step: 18px; --portrait-trail: calc(var(--portrait-step) * 3); display: block; width: 100%; position: relative; isolation: isolate; border: 0; background: transparent; padding: var(--portrait-trail) var(--portrait-trail) 0 0; cursor: grab; touch-action: none; user-select: none; }
+.portrait-frame[data-dragging] { cursor: grabbing; }
 .portrait { width: 100%; height: auto; }
 .portrait-front { position: relative; z-index: 4; }
 .portrait-copy { position: absolute; width: calc(100% - var(--portrait-trail)); pointer-events: none; }

@@ -1,4 +1,4 @@
 Noisemaker shader engine and built-in effects, v1.0.291.
 Copyright Noise Factor LLC and contributors. MIT licensed.
 Source: https://github.com/noisefactorllc/noisemaker
-Released bundles are included unchanged; only the media, corrupt, feedback, and shapeMask effects are packaged.
+Released bundles are included unchanged; only the media, corrupt, pixels, feedback, and shapeMask effects are packaged.

@@ -13,15 +13,21 @@ const effectCanvas = document.createElement('canvas');
 const frameCheck = document.createElement('canvas');
 frameCheck.width = frameCheck.height = 1;
 const checkPixels = frameCheck.getContext('2d', { willReadFrequently: true });
+const blockFallback = document.createElement('canvas');
+const blockPixels = blockFallback.getContext('2d');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
-const BORDER = 2;
+const BLOCK = 8;
+const BORDER = BLOCK;
 const PATCH = BRUSH + BORDER * 2;
+blockFallback.width = blockFallback.height = BRUSH / BLOCK;
+blockPixels.imageSmoothingEnabled = false;
 source.width = source.height = effectCanvas.width = effectCanvas.height = PATCH;
 const PROGRAM = `
 search synth, filter
 media()
   .corrupt(intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1)
+  .pixels(size: 1)
   .write(o0)
 render(o0)
 `;
@@ -29,6 +35,7 @@ render(o0)
 let renderer;
 let initPromise;
 let corruptStep;
+let pixelsStep;
 let media;
 let gpuFailed = false;
 let portraitReady = false;
@@ -38,7 +45,6 @@ let request = 0;
 let lastFrame = 0;
 let lastHoverMosh = 0;
 let hoverPoint;
-let previousPoint;
 let pendingPoint;
 let livePoint = [0.47, 0.35];
 let seed = 1;
@@ -107,9 +113,14 @@ function showWorking() {
   canvas.hidden = false;
 }
 
-function renderPatch(point, strong) {
+function brushOrigin(point, strong) {
   const x = point[0] * working.width - BRUSH / 2;
   const y = point[1] * working.height - BRUSH / 2;
+  return strong ? [Math.floor(x / BLOCK) * BLOCK, Math.floor(y / BLOCK) * BLOCK] : [x, y];
+}
+
+function renderPatch(point, strong) {
+  const [x, y] = brushOrigin(point, strong);
   // The border is a known nonblack scanline for validating GPU output. It is
   // excluded when copying the patch back, so it never appears on the portrait.
   sourceContext.fillStyle = paperColor;
@@ -124,9 +135,11 @@ function renderPatch(point, strong) {
 
   const nextMode = `${strong ? 'hover' : 'live'}:${seed}`;
   if (mode !== nextMode) {
-    renderer.applyStepParameterValues({ [corruptStep]: strong
-      ? { intensity: 100, shift: 40, sort: 50, bandHeight: 18, speed: 0, seed }
-      : { intensity: 8, shift: 5, sort: 0, bandHeight: 28, speed: 1, seed }
+    renderer.applyStepParameterValues({
+      [corruptStep]: strong
+        ? { intensity: 100, shift: 40, sort: 50, bandHeight: 24, speed: 2, seed }
+        : { intensity: 8, shift: 5, sort: 0, bandHeight: 28, speed: 1, seed },
+      [pixelsStep]: { size: strong ? BLOCK : 1 }
     });
     mode = nextMode;
   }
@@ -147,20 +160,20 @@ function renderPatch(point, strong) {
   return effectCanvas;
 }
 
-function paintPoint(point, strong, start = false) {
-  // Pull pixels from the previous cursor position into the next position.
-  // A large cursor jump starts a fresh patch rather than queuing a long trail.
-  const from = strong && !start && previousPoint
-    && Math.hypot((point[0] - previousPoint[0]) * working.width,
-      (point[1] - previousPoint[1]) * working.height) < BRUSH * 2
-    ? previousPoint : point;
-  const patch = renderPatch(from, strong);
-  const x = point[0] * working.width - BRUSH / 2;
-  const y = point[1] * working.height - BRUSH / 2;
+function paintPoint(point, strong) {
+  // Sample the current location in the edited bitmap on every render. Carrying
+  // the previous brush image forward would repeat the first patch indefinitely.
+  const patch = renderPatch(point, strong);
+  const [x, y] = brushOrigin(point, strong);
   if (strong) {
-    pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
+    pixels.imageSmoothingEnabled = false;
+    if (gpuFailed || !media) {
+      // Keep the block interaction usable when the GPU is unavailable.
+      blockPixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, 0, 0, BRUSH / BLOCK, BRUSH / BLOCK);
+      pixels.drawImage(blockFallback, x, y, BRUSH, BRUSH);
+    } else pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
+    pixels.imageSmoothingEnabled = true;
     damaged = true;
-    previousPoint = point;
     livePoint = point;
     frame.dataset.mosh = 'damaged';
     frame.dataset.hit = point.map((value) => value.toFixed(3)).join(',');
@@ -184,7 +197,7 @@ function tick(now) {
       if (pendingPoint) {
         const target = pendingPoint;
         pendingPoint = undefined;
-        paintPoint(target.point, true, target.start);
+        paintPoint(target.point, true);
         lastHoverMosh = now;
       } else if (hoverPoint && !motion.matches && now - lastHoverMosh >= 125) {
         paintPoint(hoverPoint, true);
@@ -227,13 +240,16 @@ async function initialize() {
         onContextLost: () => fallback(new Error('Portrait graphics context lost.'))
       });
       await renderer.loadManifest();
-      await renderer.loadEffects(['synth/media', 'filter/corrupt']);
+      await renderer.loadEffects(['synth/media', 'filter/corrupt', 'filter/pixels']);
       const pipeline = await renderer.compile(PROGRAM);
       const step = pipeline.graph.passes.find(
         (pass) => pass.effectKey?.split(/[/.]/).at(-1) === 'corrupt')?.stepIndex;
+      const blockStep = pipeline.graph.passes.find(
+        (pass) => pass.effectKey?.split(/[/.]/).at(-1) === 'pixels')?.stepIndex;
       media = renderer.getMediaSteps()[0];
-      if (!media || step === undefined) throw new Error('Portrait patch effect steps are unavailable.');
+      if (!media || step === undefined || blockStep === undefined) throw new Error('Portrait patch effect steps are unavailable.');
       corruptStep = `step_${step}`;
+      pixelsStep = `step_${blockStep}`;
       renderer.applyStepParameterValues({ [`step_${media.stepIndex}`]: { imageSize: [PATCH, PATCH] } });
       if (!gpuFailed) frame.dataset.renderer = 'noisemaker';
     } catch (error) { fallback(error); }
@@ -254,18 +270,18 @@ frame.addEventListener('pointerenter', (event) => {
   hoverPoint = pointAt(event);
   frame.dataset.hovering = 'true';
   seed = seed % 99 + 1;
-  pendingPoint = { point: hoverPoint, start: true };
+  pendingPoint = { point: hoverPoint };
   initialize().then(resume);
 });
 frame.addEventListener('pointermove', (event) => {
   if (event.pointerType === 'touch') return;
   hoverPoint = pointAt(event);
   // Replace the old target. The render loop always follows the latest cursor.
-  pendingPoint = { point: hoverPoint, start: !previousPoint };
+  pendingPoint = { point: hoverPoint };
   resume();
 });
 function endHover() {
-  hoverPoint = pendingPoint = previousPoint = undefined;
+  hoverPoint = pendingPoint = undefined;
   delete frame.dataset.hovering;
   resume();
 }
@@ -274,14 +290,14 @@ frame.addEventListener('pointercancel', endHover);
 frame.addEventListener('pointerdown', (event) => {
   if (event.pointerType !== 'touch' || !event.isPrimary) return;
   seed = seed % 99 + 1;
-  pendingPoint = { point: pointAt(event), start: true };
+  pendingPoint = { point: pointAt(event) };
   initialize().then(resume);
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());
 frame.addEventListener('click', (event) => {
   if (event.detail !== 0) return;
   seed = seed % 99 + 1;
-  pendingPoint = { point: [0.5, 0.35], start: true };
+  pendingPoint = { point: [0.5, 0.35] };
   initialize().then(resume);
 });
 reset.addEventListener('click', () => {

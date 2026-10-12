@@ -21,6 +21,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .skip-link:focus { top: 12px; }
 
 .hero { padding-block: 76px 64px; display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 72px; align-items: center; }
+.hero h1 { font: 400 clamp(52px, 6vw, 72px)/1.1 var(--serif); letter-spacing: -2px; margin: 0 0 24px; }
 .hero-intro { max-width: 620px; margin: 0; font-size: 18px; line-height: 1.85; }
 .hero-blurb { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
 .portrait-frame { position: relative; }
@@ -64,6 +65,7 @@ h3 { margin: 0; }
 @media (max-width: 760px) {
   .shell { width: calc(100% - 40px); }
   .hero { grid-template-columns: minmax(0, 1fr); gap: 30px; padding-block: 40px; }
+  .hero h1 { font-size: 54px; letter-spacing: -1.5px; margin-bottom: 18px; }
   .hero-intro { font-size: 16px; line-height: 1.85; }
   .profile { max-width: 280px; width: 100%; }
   .section { padding-block: 24px 30px; }
@@ -88,6 +90,7 @@ h3 { margin: 0; }
   .contact-section, .profile { display: none; }
   .shell { width: 100%; }
   .hero { display: block; padding: 20px 0; }
+  .hero h1 { font-size: 40px; }
   .section { padding: 25px 0; }
   .entry { break-inside: avoid; }
   .entry-indicator { display: none; }

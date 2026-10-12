@@ -10,18 +10,16 @@
   <meta property="og:type" content="website">
   <title>Eric Seo Portfolio</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=3">
   <script src="script.js?v=2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <main id="main">
-    <section class="hero shell" id="top" aria-labelledby="hero-title">
+    <section class="hero shell" id="top" aria-label="Introduction">
       <div class="hero-copy">
-        <h1 id="hero-title">Eric Seo</h1>
         <p class="hero-intro">Hi! I'm Eric, an ECE Junior at Cornell University. My interests range from Haptic Feedback Systems and PCB Design to creating software for Music Production.</p>
         <p class="hero-blurb">Learn more about my Project Team, Cornell XR, <a href="https://cornellxr.com/" target="_blank" rel="noopener noreferrer">here</a>.</p>
-        <div class="intro-links"><a href="mailto:eys39@cornell.edu">Email</a><a href="https://www.linkedin.com/in/eric-seo39/" target="_blank" rel="noopener noreferrer">LinkedIn</a><a href="https://github.com/ericseo56" target="_blank" rel="noopener noreferrer">GitHub</a></div>
       </div>
       <aside class="profile" aria-label="Profile">
         <div class="portrait-frame" id="portrait-frame">
@@ -32,23 +30,65 @@
 
     <section class="section shell" id="projects" aria-labelledby="projects-title">
       <div class="section-heading"><h2 id="projects-title">Projects</h2></div>
-      <article class="project">
-        <div class="project-meta"><span>Cornell XR</span><span>April 2026 — Present</span></div>
-        <div class="project-body"><h3>Omnidirectional treadmill</h3><p class="project-description">I’m leading the design of a 360-degree VR treadmill, including its mechanical requirements, control electronics, and camera-based motion tracking.</p>
+      <details class="entry">
+        <summary class="entry-heading">
+          <span class="entry-meta"><span>Cornell XR</span><span>April 2026 — Present</span></span>
+          <h3>Omnidirectional treadmill</h3>
+          <span class="entry-indicator" aria-hidden="true"></span>
+        </summary>
+        <div class="entry-content">
+          <p>Project description goes here.</p>
+          <div class="image-placeholder" role="img" aria-label="Image placeholder for Omnidirectional treadmill"><span>Project image</span></div>
         </div>
-      </article>
-      <article class="project">
-        <div class="project-meta"><span>Cornell Makeathon</span><span>February 2026</span><span class="award">Best Hardware Winner</span></div>
-        <div class="project-body"><h3>DEX <span class="project-subtitle">(Dextrous Hand)</span></h3><p class="project-description">A wearable hand-tracking device we built for Cornell Makeathon. I put together the ESP32 electronics and wrote the firmware to read its sensors and send finger-tracking data to a web platform for rehabilitation and accessibility applications.</p>
+      </details>
+      <details class="entry">
+        <summary class="entry-heading">
+          <span class="entry-meta"><span>Cornell Makeathon</span><span>February 2026</span><span class="award">Best Hardware Winner</span></span>
+          <h3>DEX <span class="project-subtitle">(Dextrous Hand)</span></h3>
+          <span class="entry-indicator" aria-hidden="true"></span>
+        </summary>
+        <div class="entry-content">
+          <p>Project description goes here.</p>
+          <div class="image-placeholder" role="img" aria-label="Image placeholder for DEX"><span>Project image</span></div>
         </div>
-      </article>
+      </details>
     </section>
 
     <section class="experience-section" id="experience" aria-labelledby="experience-title"><div class="section shell">
       <div class="section-heading"><h2 id="experience-title">Experience</h2></div>
-      <article class="experience-row"><div class="experience-meta"><p>May — August 2026</p><p>El Segundo, CA</p></div><div class="experience-content"><div class="role-heading"><h3>Picogrid</h3><span>Hardware Intern</span></div></div></article>
-      <article class="experience-row"><div class="experience-meta"><p>January 2025 — Present</p><p>Ithaca, NY</p></div><div class="experience-content"><div class="role-heading"><h3>Cornell University<br>eXtended Reality</h3><span>Full Team Lead</span></div></div></article>
-      <article class="experience-row"><div class="experience-meta"><p>May — August 2025</p><p>Olathe, KS</p></div><div class="experience-content"><div class="role-heading"><h3>Kiewit Power Engineering</h3><span>Power Engineer</span></div></div></article>
+      <details class="entry">
+        <summary class="entry-heading">
+          <span class="entry-meta"><span>May — August 2026</span><span>El Segundo, CA</span></span>
+          <div class="entry-title"><h3>Picogrid</h3><span class="entry-role">Hardware Intern</span></div>
+          <span class="entry-indicator" aria-hidden="true"></span>
+        </summary>
+        <div class="entry-content">
+          <p>Experience description goes here.</p>
+          <div class="image-placeholder" role="img" aria-label="Image placeholder for Picogrid"><span>Experience image</span></div>
+        </div>
+      </details>
+      <details class="entry">
+        <summary class="entry-heading">
+          <span class="entry-meta"><span>January 2025 — Present</span><span>Ithaca, NY</span></span>
+          <div class="entry-title"><h3>Cornell University<br>eXtended Reality</h3><span class="entry-role">Full Team Lead</span></div>
+          <span class="entry-indicator" aria-hidden="true"></span>
+        </summary>
+        <div class="entry-content">
+          <p>Experience description goes here.</p>
+          <div class="image-placeholder" role="img" aria-label="Image placeholder for Cornell XR"><span>Experience image</span></div>
+        </div>
+      </details>
+      <details class="entry">
+        <summary class="entry-heading">
+          <span class="entry-meta"><span>May — August 2025</span><span>Olathe, KS</span></span>
+          <div class="entry-title"><h3>Kiewit Power Engineering</h3><span class="entry-role">Power Engineer</span></div>
+          <span class="entry-indicator" aria-hidden="true"></span>
+        </summary>
+        <div class="entry-content">
+          <p>Experience description goes here.</p>
+          <div class="image-placeholder" role="img" aria-label="Image placeholder for Kiewit Power Engineering"><span>Experience image</span></div>
+        </div>
+      </details>
     </div></section>
 
     <section class="contact-section shell" id="contact" aria-labelledby="contact-title"><h2 id="contact-title">Contact</h2><div class="contact-links"><a class="contact-email" href="mailto:eys39@cornell.edu">eys39@cornell.edu</a><div><a href="https://www.linkedin.com/in/eric-seo39/" target="_blank" rel="noopener noreferrer">LinkedIn</a><a href="https://github.com/ericseo56" target="_blank" rel="noopener noreferrer">GitHub</a><a href="assets/eric-seo-resume.pdf" target="_blank" rel="noopener">Resume</a></div></div></section>

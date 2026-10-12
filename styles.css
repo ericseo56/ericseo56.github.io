@@ -9,7 +9,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { scroll-behavior: smooth; scroll-padding-top: 100px; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
 body { margin: 0; background: #fff; color: var(--ink); font: 16px/1.75 var(--sans); }
 a { color: inherit; text-underline-offset: 5px; text-decoration-thickness: 1px; }
 button { font: inherit; }
@@ -19,14 +19,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outlin
 .shell { width: min(1040px, calc(100% - 96px)); margin-inline: auto; }
 .skip-link { position: fixed; left: 24px; top: -100px; z-index: 100; background: var(--ink); color: #fff; padding: 12px 20px; }
 .skip-link:focus { top: 12px; }
-.site-header { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--line); }
-.nav { min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.wordmark { font-size: 16px; font-weight: 400; text-decoration: none; white-space: nowrap; }
-.nav-links { display: flex; align-items: center; gap: 28px; }
-.nav-links a { font-size: 14px; text-decoration: none; }
-.nav-links a:hover, .nav-links a[aria-current='location'] { color: var(--accent); }
-.nav-links .nav-resume { border: 1px solid var(--ink); padding: 7px 16px; }
-.menu-toggle { display: none; }
 
 .hero { padding-block: 76px 64px; display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 72px; align-items: center; }
 .hero h1 { font: 400 clamp(52px, 6vw, 72px)/1.1 var(--serif); letter-spacing: -2px; margin: 0 0 24px; }
@@ -61,9 +53,6 @@ h3 { margin: 0; }
 .site-footer { border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 20px; font-size: 12px; color: var(--muted); min-height: 78px; }
 .site-footer a { text-decoration: none; }
 
-@media (min-width: 761px) {
-  .nav-links { display: flex !important; }
-}
 @media (max-width: 1000px) {
   .shell { width: calc(100% - 64px); }
   .hero { grid-template-columns: minmax(0, 1fr) 230px; gap: 40px; padding-block: 56px; }
@@ -71,16 +60,7 @@ h3 { margin: 0; }
   .role-heading { flex-direction: column; gap: 4px; }
 }
 @media (max-width: 760px) {
-  html { scroll-padding-top: 84px; }
   .shell { width: calc(100% - 40px); }
-  .nav { min-height: 72px; flex-wrap: wrap; gap: 0; }
-  .menu-toggle:not([hidden]) { display: flex; align-items: center; gap: 12px; border: 0; background: none; color: var(--ink); padding: 12px 0 12px 12px; min-height: 44px; font-size: 14px; cursor: pointer; }
-  .menu-icon { position: relative; width: 18px; height: 10px; border-block: 1px solid currentColor; }
-  .menu-toggle[aria-expanded='true'] .menu-icon { height: 0; border-bottom: 0; transform: rotate(45deg); }
-  .menu-toggle[aria-expanded='true'] .menu-icon::after { content: ''; position: absolute; left: 0; top: -1px; width: 18px; border-top: 1px solid currentColor; transform: rotate(-90deg); }
-  .nav-links { flex-basis: 100%; flex-direction: column; align-items: stretch; gap: 0; padding: 8px 0 20px; }
-  .nav-links a { font-size: 16px; padding: 12px 0; border-top: 1px solid var(--line); }
-  .nav-links .nav-resume { padding: 10px 16px; text-align: center; margin-top: 10px; }
   .hero { grid-template-columns: minmax(0, 1fr); gap: 30px; padding-block: 40px; }
   .hero h1 { font-size: 54px; letter-spacing: -1.5px; margin-bottom: 18px; }
   .hero-intro { font-size: 16px; line-height: 1.85; }
@@ -103,7 +83,7 @@ h3 { margin: 0; }
   *, *::before, *::after { transition: none !important; }
 }
 @media print {
-  .site-header, .intro-links, .contact-section, .site-footer, .profile { display: none; }
+  .intro-links, .contact-section, .site-footer, .profile { display: none; }
   .shell { width: 100%; }
   .hero { display: block; padding: 20px 0; }
   .hero h1 { font-size: 40px; }

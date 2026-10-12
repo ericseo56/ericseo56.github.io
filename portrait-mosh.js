@@ -10,6 +10,9 @@ const pixels = working.getContext('2d');
 const source = document.createElement('canvas');
 const sourceContext = source.getContext('2d');
 const effectCanvas = document.createElement('canvas');
+const frameCheck = document.createElement('canvas');
+frameCheck.width = frameCheck.height = 4;
+const checkPixels = frameCheck.getContext('2d', { willReadFrequently: true });
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const RADIUS = 0.10;
 const PROGRAM = `
@@ -35,6 +38,7 @@ let pointer;
 let previousPoint;
 let seed = 1;
 let damaged = false;
+let portraitReady = false;
 const pending = [];
 
 function stop() {
@@ -47,12 +51,14 @@ function restorePhoto(error) {
   failed = true;
   stop();
   pending.length = 0;
-  canvas.hidden = true;
+  // Keep the last good bitmap visible when the GPU stops producing frames.
+  if (portraitReady) showWorking();
+  else canvas.hidden = true;
   frame.dataset.mosh = 'unavailable';
   frame.disabled = true;
   frame.setAttribute('aria-label', 'Eric Seo portrait');
   Promise.resolve(renderer?.dispose()).catch(() => {});
-  console.warn('Portrait effect unavailable; keeping the photograph.', error);
+  console.warn('Portrait effect unavailable; keeping the last good photograph.', error);
 }
 
 function drawOriginal() {
@@ -83,6 +89,7 @@ function resizePortrait() {
   working.height = canvas.height = effectCanvas.height = height;
   if (damaged) pixels.drawImage(source, 0, 0, width, height);
   else drawOriginal();
+  portraitReady = true;
   source.width = width;
   source.height = height;
   renderer.resize(width, height);
@@ -92,7 +99,30 @@ function resizePortrait() {
 }
 
 function uploadPixels() {
-  renderer.updateTextureFromSource(media.textureId, working, { flipY: false });
+  const size = renderer.updateTextureFromSource(media.textureId, working, { flipY: false });
+  if (size.width !== working.width || size.height !== working.height) {
+    throw new Error('Portrait texture upload did not complete.');
+  }
+}
+
+function renderEffect() {
+  // Parameter updates can recreate the engine's textures. Upload afterward,
+  // on every frame, so the input always contains the current portrait.
+  uploadPixels();
+  renderer.render(time);
+  if (failed) return false;
+  checkPixels.clearRect(0, 0, 4, 4);
+  checkPixels.drawImage(effectCanvas, 0, 0, 4, 4);
+  const samples = checkPixels.getImageData(0, 0, 4, 4).data;
+  let visibleColor = 0;
+  for (let i = 0; i < samples.length; i += 4) {
+    if (samples[i + 3] > 0) visibleColor += samples[i] + samples[i + 1] + samples[i + 2];
+  }
+  if (visibleColor < 48) {
+    restorePhoto(new Error('Portrait renderer returned an empty frame.'));
+    return false;
+  }
+  return true;
 }
 
 function showWorking() {
@@ -105,8 +135,7 @@ function liveFrame() {
     [steps.corrupt]: { intensity: 8, shift: 5, sort: 0, bandHeight: 28, speed: 1, seed },
     [steps.mask]: { radius: 1, posX: 0, posY: 0 }
   });
-  renderer.render(time);
-  if (!failed) output.drawImage(effectCanvas, 0, 0);
+  if (renderEffect()) output.drawImage(effectCanvas, 0, 0);
 }
 
 function dragPixels(from, to) {
@@ -127,13 +156,11 @@ function dragPixels(from, to) {
     pixels.drawImage(source, dx, dy);
     pixels.restore();
   }
-  uploadPixels();
   renderer.applyStepParameterValues({
     [steps.corrupt]: { intensity: 100, shift: 32, sort: 35, bandHeight: 26, speed: 0, seed },
     [steps.mask]: { posX: to[0] * 2 - 1, posY: to[1] * 2 - 1, radius: RADIUS }
   });
-  renderer.render(time);
-  if (failed) return;
+  if (!renderEffect()) return;
   // Replace the backing bitmap with the native effect's output. Every next
   // stroke and every live frame reads this edited image, never a clean layer.
   pixels.drawImage(effectCanvas, 0, 0);
@@ -159,7 +186,7 @@ function processStroke() {
     target.start = false;
     if (fraction === 1) pending.shift();
   }
-  uploadPixels();
+  if (!failed) uploadPixels();
   showWorking();
 }
 
@@ -265,9 +292,9 @@ reset.addEventListener('click', () => {
   damaged = false;
   frame.dataset.mosh = failed ? 'unavailable' : 'clean';
   delete frame.dataset.hit;
-  if (media && !failed) {
+  if (portraitReady) {
     drawOriginal();
-    uploadPixels();
+    if (!failed) uploadPixels();
     showWorking();
   }
 });

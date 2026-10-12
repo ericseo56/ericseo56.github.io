@@ -1,4 +1,4 @@
-// Noisemaker supplies the scanline displacement; the backing bitmap keeps edits.
+// Noisemaker processes a fixed-size patch; the portrait stays in a 2D bitmap.
 const VENDOR = new URL('./assets/vendor/noisemaker', import.meta.url).href;
 const frame = document.querySelector('#portrait-frame');
 const reset = document.querySelector('#portrait-reset');
@@ -11,61 +11,66 @@ const source = document.createElement('canvas');
 const sourceContext = source.getContext('2d');
 const effectCanvas = document.createElement('canvas');
 const frameCheck = document.createElement('canvas');
-frameCheck.width = frameCheck.height = 4;
+frameCheck.width = frameCheck.height = 1;
 const checkPixels = frameCheck.getContext('2d', { willReadFrequently: true });
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const RADIUS = 0.10;
+const BRUSH = 48;
+const BORDER = 2;
+const PATCH = BRUSH + BORDER * 2;
+source.width = source.height = effectCanvas.width = effectCanvas.height = PATCH;
 const PROGRAM = `
-search synth, filter, mixer
-media().write(o0)
-read(o0)
+search synth, filter
+media()
   .corrupt(intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1)
-  .shapeMask(tex: read(o0), shape: square, radius: 1, edgeSmooth: 0.003)
-  .write(o1)
-render(o1)
+  .write(o0)
+render(o0)
 `;
 
 let renderer;
 let initPromise;
-let steps;
+let corruptStep;
 let media;
-let failed = false;
+let gpuFailed = false;
+let portraitReady = false;
+let damaged = false;
 let visible = false;
 let request = 0;
 let lastFrame = 0;
-let time = 0;
-let hoverPoint;
 let lastHoverMosh = 0;
+let hoverPoint;
 let previousPoint;
+let pendingPoint;
+let livePoint = [0.47, 0.35];
 let seed = 1;
-let damaged = false;
-let portraitReady = false;
-const pending = [];
+let mode;
+let frameBudget = 1000 / 24;
+let statsStart = 0;
+let statsFrames = 0;
+let statsCost = 0;
+let patchTime = 0;
+let paperColor = '#FAF7F0';
 
 function stop() {
   cancelAnimationFrame(request);
   request = 0;
 }
 
-function restorePhoto(error) {
-  if (failed) return;
-  failed = true;
-  stop();
-  pending.length = 0;
-  // Keep the last good bitmap visible when the GPU stops producing frames.
+function fallback(error) {
+  if (gpuFailed) return;
+  gpuFailed = true;
+  mode = undefined;
   if (portraitReady) showWorking();
-  else canvas.hidden = true;
-  frame.dataset.mosh = 'unavailable';
-  frame.disabled = true;
-  frame.setAttribute('aria-label', 'Eric Seo portrait');
+  // Keep hover and Reset usable even if the graphics driver fails.
+  frame.dataset.renderer = '2d';
   Promise.resolve(renderer?.dispose()).catch(() => {});
-  console.warn('Portrait effect unavailable; keeping the last good photograph.', error);
+  console.warn('Portrait shader unavailable; keeping pixel movement usable.', error);
 }
 
 function drawOriginal() {
   const bounds = frame.getBoundingClientRect();
   const density = working.width / bounds.width;
-  pixels.fillStyle = getComputedStyle(document.body).backgroundColor;
+  paperColor = getComputedStyle(document.body).backgroundColor;
+  pixels.fillStyle = paperColor;
   pixels.fillRect(0, 0, working.width, working.height);
   frame.querySelectorAll('.portrait').forEach((image) => {
     const box = image.getBoundingClientRect();
@@ -78,52 +83,23 @@ function drawOriginal() {
 
 function resizePortrait() {
   const bounds = frame.getBoundingClientRect();
-  const density = Math.min(window.devicePixelRatio || 1, 1.5, 480 / bounds.width);
+  // The effect is deliberately independent of device pixel ratio.
+  const density = Math.min(1, 320 / bounds.width);
   const width = Math.round(bounds.width * density);
   const height = Math.round(bounds.height * density);
-  if (!width || !height || (working.width === width && working.height === height)) return;
-  // Resize the edited bitmap rather than reconstructing the pristine photo.
-  source.width = working.width;
-  source.height = working.height;
-  sourceContext.drawImage(working, 0, 0);
-  working.width = canvas.width = effectCanvas.width = width;
-  working.height = canvas.height = effectCanvas.height = height;
-  if (damaged) pixels.drawImage(source, 0, 0, width, height);
+  if (!width || !height || (portraitReady && working.width === width && working.height === height)) return;
+  const previous = document.createElement('canvas');
+  if (damaged) {
+    previous.width = working.width;
+    previous.height = working.height;
+    previous.getContext('2d').drawImage(working, 0, 0);
+  }
+  working.width = canvas.width = width;
+  working.height = canvas.height = height;
+  if (damaged) pixels.drawImage(previous, 0, 0, width, height);
   else drawOriginal();
   portraitReady = true;
-  source.width = width;
-  source.height = height;
-  renderer.resize(width, height);
-  renderer.applyStepParameterValues({ [`step_${media.stepIndex}`]: { imageSize: [width, height] } });
-  uploadPixels();
   showWorking();
-}
-
-function uploadPixels() {
-  const size = renderer.updateTextureFromSource(media.textureId, working, { flipY: false });
-  if (size.width !== working.width || size.height !== working.height) {
-    throw new Error('Portrait texture upload did not complete.');
-  }
-}
-
-function renderEffect() {
-  // Parameter updates can recreate the engine's textures. Upload afterward,
-  // on every frame, so the input always contains the current portrait.
-  uploadPixels();
-  renderer.render(time);
-  if (failed) return false;
-  checkPixels.clearRect(0, 0, 4, 4);
-  checkPixels.drawImage(effectCanvas, 0, 0, 4, 4);
-  const samples = checkPixels.getImageData(0, 0, 4, 4).data;
-  let visibleColor = 0;
-  for (let i = 0; i < samples.length; i += 4) {
-    if (samples[i + 3] > 0) visibleColor += samples[i] + samples[i + 1] + samples[i + 2];
-  }
-  if (visibleColor < 48) {
-    restorePhoto(new Error('Portrait renderer returned an empty frame.'));
-    return false;
-  }
-  return true;
 }
 
 function showWorking() {
@@ -131,118 +107,139 @@ function showWorking() {
   canvas.hidden = false;
 }
 
-function liveFrame() {
-  renderer.applyStepParameterValues({
-    [steps.corrupt]: { intensity: 8, shift: 5, sort: 0, bandHeight: 28, speed: 1, seed },
-    [steps.mask]: { radius: 1, posX: 0, posY: 0 }
-  });
-  if (renderEffect()) output.drawImage(effectCanvas, 0, 0);
+function renderPatch(point, strong) {
+  const x = point[0] * working.width - BRUSH / 2;
+  const y = point[1] * working.height - BRUSH / 2;
+  // The border is a known nonblack scanline for validating GPU output. It is
+  // excluded when copying the patch back, so it never appears on the portrait.
+  sourceContext.fillStyle = paperColor;
+  sourceContext.fillRect(0, 0, PATCH, PATCH);
+  sourceContext.save();
+  sourceContext.beginPath();
+  sourceContext.rect(BORDER, BORDER, BRUSH, BRUSH);
+  sourceContext.clip();
+  sourceContext.drawImage(working, BORDER - x, BORDER - y);
+  sourceContext.restore();
+  if (gpuFailed || !media) return source;
+
+  const nextMode = `${strong ? 'hover' : 'live'}:${seed}`;
+  if (mode !== nextMode) {
+    renderer.applyStepParameterValues({ [corruptStep]: strong
+      ? { intensity: 100, shift: 40, sort: 50, bandHeight: 18, speed: 0, seed }
+      : { intensity: 8, shift: 5, sort: 0, bandHeight: 28, speed: 1, seed }
+    });
+    mode = nextMode;
+  }
+  // Upload after parameter updates, which can recreate engine textures.
+  const uploaded = renderer.updateTextureFromSource(media.textureId, source, { flipY: false });
+  if (uploaded.width !== PATCH || uploaded.height !== PATCH) {
+    fallback(new Error('Portrait patch texture did not upload.'));
+    return source;
+  }
+  renderer.render(patchTime);
+  if (gpuFailed) return source;
+  checkPixels.drawImage(effectCanvas, 0, 0, 1, 1, 0, 0, 1, 1);
+  const sample = checkPixels.getImageData(0, 0, 1, 1).data;
+  if (sample[0] + sample[1] + sample[2] < 48 || sample[3] < 128) {
+    fallback(new Error('Portrait shader returned an empty patch.'));
+    return source;
+  }
+  return effectCanvas;
 }
 
-function moshPixels(from, to) {
-  const width = working.width;
-  const height = working.height;
-  const radius = RADIUS * height / 2;
-  const dx = (to[0] - from[0]) * width;
-  const dy = (to[1] - from[1]) * height;
-  // Move existing image pixels with the pointer, including previous damage.
-  // No fresh portrait or generated noise is painted over a stroke.
-  if (dx || dy) {
-    sourceContext.clearRect(0, 0, width, height);
-    sourceContext.drawImage(working, 0, 0);
-    pixels.save();
-    pixels.beginPath();
-    pixels.rect(to[0] * width - radius, to[1] * height - radius, radius * 2, radius * 2);
-    pixels.clip();
-    pixels.drawImage(source, dx, dy);
-    pixels.restore();
+function paintPoint(point, strong, start = false) {
+  // Pull pixels from the previous cursor position into the next position.
+  // A large cursor jump starts a fresh patch rather than queuing a long trail.
+  const from = strong && !start && previousPoint
+    && Math.hypot((point[0] - previousPoint[0]) * working.width,
+      (point[1] - previousPoint[1]) * working.height) < BRUSH * 2
+    ? previousPoint : point;
+  const patch = renderPatch(from, strong);
+  const x = point[0] * working.width - BRUSH / 2;
+  const y = point[1] * working.height - BRUSH / 2;
+  if (strong) {
+    pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
+    damaged = true;
+    previousPoint = point;
+    livePoint = point;
+    frame.dataset.mosh = 'damaged';
+    frame.dataset.hit = point.map((value) => value.toFixed(3)).join(',');
+    showWorking();
+  } else {
+    showWorking();
+    output.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
   }
-  renderer.applyStepParameterValues({
-    [steps.corrupt]: { intensity: 100, shift: 32, sort: 35, bandHeight: 26, speed: 0, seed },
-    [steps.mask]: { posX: to[0] * 2 - 1, posY: to[1] * 2 - 1, radius: RADIUS }
-  });
-  if (!renderEffect()) return;
-  // Replace the backing bitmap with the native effect's output. Every next
-  // stroke and every live frame reads this edited image, never a clean layer.
-  pixels.drawImage(effectCanvas, 0, 0);
-  damaged = true;
-  frame.dataset.mosh = 'damaged';
-  frame.dataset.hit = to.map((value) => value.toFixed(3)).join(',');
-}
-
-function processTrail() {
-  // Bound GPU work and interpolate sparse pointer events for an unbroken trail.
-  for (let count = 0; count < 3 && pending.length && !failed; count++) {
-    const target = pending[0];
-    if (target.start || !previousPoint) previousPoint = target.point;
-    const dx = (target.point[0] - previousPoint[0]) * working.width;
-    const dy = (target.point[1] - previousPoint[1]) * working.height;
-    const distance = Math.hypot(dx, dy);
-    const step = Math.max(3, RADIUS * working.height / 5);
-    const fraction = distance > step ? step / distance : 1;
-    const next = [previousPoint[0] + (target.point[0] - previousPoint[0]) * fraction,
-      previousPoint[1] + (target.point[1] - previousPoint[1]) * fraction];
-    moshPixels(previousPoint, next);
-    previousPoint = next;
-    target.start = false;
-    if (fraction === 1) pending.shift();
-  }
-  if (!failed) uploadPixels();
-  showWorking();
 }
 
 function tick(now) {
   request = 0;
-  if (!visible || document.hidden || failed) return;
-  if (now - lastFrame >= 1000 / 30 - 1) {
-    time += Math.min((now - lastFrame) / 1000, 0.1) / 8;
+  if (!visible || document.hidden || !portraitReady) return;
+  const interval = pendingPoint ? frameBudget
+    : Math.max(frameBudget, hoverPoint ? 125 : 1000 / 12);
+  if (now - lastFrame >= interval - 1) {
+    patchTime += Math.min((now - lastFrame) / 1000, 0.15) / 8;
     lastFrame = now;
+    const began = performance.now();
     try {
-      if (hoverPoint && !pending.length && now - lastHoverMosh >= 120 && !motion.matches) {
-        pending.push({ point: hoverPoint, start: true });
-      }
-      if (pending.length) { processTrail(); lastHoverMosh = now; }
-      else if (!motion.matches && !hoverPoint) liveFrame();
-    } catch (error) { restorePhoto(error); }
+      if (pendingPoint) {
+        const target = pendingPoint;
+        pendingPoint = undefined;
+        paintPoint(target.point, true, target.start);
+        lastHoverMosh = now;
+      } else if (hoverPoint && !motion.matches && now - lastHoverMosh >= 125) {
+        paintPoint(hoverPoint, true);
+        lastHoverMosh = now;
+      } else if (!hoverPoint && !motion.matches && !gpuFailed) paintPoint(livePoint, false);
+    } catch (error) { fallback(error); }
+    const cost = performance.now() - began;
+    // Back off on slower devices instead of building up delayed cursor work.
+    frameBudget = Math.max(1000 / 24, Math.min(100, cost * 2));
+    statsFrames++;
+    statsCost += cost;
+    if (now - statsStart >= 1000) {
+      frame.dataset.renderMs = (statsCost / statsFrames).toFixed(1);
+      frame.dataset.fps = String(Math.round(statsFrames * 1000 / (now - statsStart)));
+      statsStart = now;
+      statsCost = statsFrames = 0;
+    }
   }
   resume();
 }
 
 function resume() {
-  if (!renderer || !media || failed || !visible || document.hidden || request) return;
-  if (motion.matches && !pending.length) return;
+  if (!portraitReady || !visible || document.hidden || request) return;
+  if (!pendingPoint && (motion.matches || (gpuFailed && !hoverPoint))) return;
   request = requestAnimationFrame(tick);
 }
 
 async function initialize() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const [{ CanvasRenderer }] = await Promise.all([import(`${VENDOR}/core.js`), photo.decode()]);
-    renderer = new CanvasRenderer({
-      canvas: effectCanvas, width: 480, height: 700, basePath: VENDOR,
-      useBundles: true, bundlePath: `${VENDOR}/effects`, preferWebGPU: false,
-      preserveDrawingBuffer: true, onError: restorePhoto,
-      onContextLost: () => restorePhoto(new Error('Portrait graphics context lost.'))
-    });
-    await renderer.loadManifest();
-    await renderer.loadEffects(['synth/media', 'filter/corrupt', 'mixer/shapeMask']);
-    const pipeline = await renderer.compile(PROGRAM);
-    const effectStep = (name) => pipeline.graph.passes.find(
-      (pass) => pass.effectKey?.split(/[/.]/).at(-1) === name)?.stepIndex;
-    steps = { corrupt: `step_${effectStep('corrupt')}`, mask: `step_${effectStep('shapeMask')}` };
-    media = renderer.getMediaSteps()[0];
-    if (!media || Object.values(steps).some((key) => key.includes('undefined'))) {
-      throw new Error('Portrait effect steps could not be resolved.');
-    }
+    await photo.decode();
     resizePortrait();
-    new ResizeObserver(() => {
-      if (!failed) {
-        try { resizePortrait(); } catch (error) { restorePhoto(error); }
-      }
-    }).observe(frame);
-    lastFrame = performance.now();
+    new ResizeObserver(resizePortrait).observe(frame);
+    try {
+      const { CanvasRenderer } = await import(`${VENDOR}/core.js`);
+      renderer = new CanvasRenderer({
+        canvas: effectCanvas, width: PATCH, height: PATCH, basePath: VENDOR,
+        useBundles: true, bundlePath: `${VENDOR}/effects`, preferWebGPU: false,
+        preserveDrawingBuffer: true, onError: fallback,
+        onContextLost: () => fallback(new Error('Portrait graphics context lost.'))
+      });
+      await renderer.loadManifest();
+      await renderer.loadEffects(['synth/media', 'filter/corrupt']);
+      const pipeline = await renderer.compile(PROGRAM);
+      const step = pipeline.graph.passes.find(
+        (pass) => pass.effectKey?.split(/[/.]/).at(-1) === 'corrupt')?.stepIndex;
+      media = renderer.getMediaSteps()[0];
+      if (!media || step === undefined) throw new Error('Portrait patch effect steps are unavailable.');
+      corruptStep = `step_${step}`;
+      renderer.applyStepParameterValues({ [`step_${media.stepIndex}`]: { imageSize: [PATCH, PATCH] } });
+      if (!gpuFailed) frame.dataset.renderer = 'noisemaker';
+    } catch (error) { fallback(error); }
+    lastFrame = statsStart = performance.now();
     resume();
-  })().catch(restorePhoto);
+  })().catch(fallback);
   return initPromise;
 }
 
@@ -253,72 +250,59 @@ function pointAt(event) {
 }
 
 frame.addEventListener('pointerenter', (event) => {
-  if (failed || event.pointerType === 'touch') return;
+  if (event.pointerType === 'touch') return;
   hoverPoint = pointAt(event);
   frame.dataset.hovering = 'true';
   seed = seed % 99 + 1;
-  pending.push({ point: hoverPoint, start: true });
+  pendingPoint = { point: hoverPoint, start: true };
   initialize().then(resume);
 });
 frame.addEventListener('pointermove', (event) => {
-  if (failed || event.pointerType === 'touch') return;
-  const point = pointAt(event);
-  hoverPoint = point;
-  const last = pending.at(-1)?.point || previousPoint;
-  if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) > 0.003) {
-    if (pending.length >= 6) pending.at(-1).point = point;
-    else pending.push({ point, start: !last });
-    resume();
-  }
+  if (event.pointerType === 'touch') return;
+  hoverPoint = pointAt(event);
+  // Replace the old target. The render loop always follows the latest cursor.
+  pendingPoint = { point: hoverPoint, start: !previousPoint };
+  resume();
 });
 function endHover() {
-  hoverPoint = undefined;
-  pending.length = 0;
-  previousPoint = undefined;
+  hoverPoint = pendingPoint = previousPoint = undefined;
   delete frame.dataset.hovering;
   resume();
 }
 frame.addEventListener('pointerleave', endHover);
 frame.addEventListener('pointercancel', endHover);
-// Touchscreens have no hover: a tap applies the same localized effect.
 frame.addEventListener('pointerdown', (event) => {
-  if (failed || event.pointerType !== 'touch' || !event.isPrimary) return;
+  if (event.pointerType !== 'touch' || !event.isPrimary) return;
   seed = seed % 99 + 1;
-  pending.push({ point: pointAt(event), start: true });
+  pendingPoint = { point: pointAt(event), start: true };
   initialize().then(resume);
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());
 frame.addEventListener('click', (event) => {
-  if (event.detail !== 0 || failed) return;
+  if (event.detail !== 0) return;
   seed = seed % 99 + 1;
-  pending.push({ point: [0.5, 0.35], start: true });
+  pendingPoint = { point: [0.5, 0.35], start: true };
   initialize().then(resume);
 });
 reset.addEventListener('click', () => {
-  pending.length = 0;
-  previousPoint = undefined;
-  hoverPoint = undefined;
-  delete frame.dataset.hovering;
+  endHover();
   damaged = false;
-  frame.dataset.mosh = failed ? 'unavailable' : 'clean';
+  livePoint = [0.47, 0.35];
+  frame.dataset.mosh = 'clean';
   delete frame.dataset.hit;
-  if (portraitReady) {
-    drawOriginal();
-    if (!failed) uploadPixels();
-    showWorking();
-  }
+  if (portraitReady) { drawOriginal(); showWorking(); }
 });
 new IntersectionObserver(([entry]) => {
   visible = entry.isIntersecting;
   if (visible) initialize().then(resume);
-  else stop();
+  else { endHover(); stop(); }
 }, { threshold: 0.05 }).observe(frame);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) stop();
+  if (document.hidden) { endHover(); stop(); }
   else { lastFrame = performance.now(); resume(); }
 });
 motion.addEventListener('change', () => {
   stop();
-  if (motion.matches && media && !failed) showWorking();
+  if (motion.matches && portraitReady) showWorking();
   resume();
 });

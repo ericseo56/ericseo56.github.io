@@ -11,23 +11,22 @@ const source = document.createElement('canvas');
 const sourceContext = source.getContext('2d');
 const effectCanvas = document.createElement('canvas');
 const frameCheck = document.createElement('canvas');
-frameCheck.width = frameCheck.height = 1;
+frameCheck.width = 4;
+frameCheck.height = 1;
 const checkPixels = frameCheck.getContext('2d', { willReadFrequently: true });
-const blockFallback = document.createElement('canvas');
-const blockPixels = blockFallback.getContext('2d');
+const bandFallback = document.createElement('canvas');
+const bandPixels = bandFallback.getContext('2d');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
-const BLOCK = 8;
-const BORDER = BLOCK;
-const PATCH = BRUSH + BORDER * 2;
-blockFallback.width = blockFallback.height = BRUSH / BLOCK;
-blockPixels.imageSmoothingEnabled = false;
+const PATCH = 96;
+const BORDER = (PATCH - BRUSH) / 2;
+bandFallback.width = bandFallback.height = BRUSH;
 source.width = source.height = effectCanvas.width = effectCanvas.height = PATCH;
 const PROGRAM = `
 search synth, filter
 media()
   .corrupt(intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1)
-  .pixels(size: 1)
+  .feedback(mix: 0, scaleAmt: 108, rotation: 1.5, aberration: 65, distortion: 12, blendMode: mix)
   .write(o0)
 render(o0)
 `;
@@ -35,7 +34,7 @@ render(o0)
 let renderer;
 let initPromise;
 let corruptStep;
-let pixelsStep;
+let feedbackStep;
 let media;
 let gpuFailed = false;
 let portraitReady = false;
@@ -49,6 +48,8 @@ let pendingPoint;
 let livePoint = [0.47, 0.35];
 let seed = 1;
 let mode;
+let historyKey;
+let feedbackReset;
 let frameBudget = 1000 / 24;
 let statsStart = 0;
 let statsFrames = 0;
@@ -116,7 +117,7 @@ function showWorking() {
 function brushOrigin(point, strong) {
   const x = point[0] * working.width - BRUSH / 2;
   const y = point[1] * working.height - BRUSH / 2;
-  return strong ? [Math.floor(x / BLOCK) * BLOCK, Math.floor(y / BLOCK) * BLOCK] : [x, y];
+  return strong ? [Math.round(x), Math.round(y)] : [x, y];
 }
 
 function renderPatch(point, strong) {
@@ -127,7 +128,7 @@ function renderPatch(point, strong) {
   sourceContext.fillRect(0, 0, PATCH, PATCH);
   sourceContext.save();
   sourceContext.beginPath();
-  sourceContext.rect(BORDER, BORDER, BRUSH, BRUSH);
+  sourceContext.rect(2, 2, PATCH - 4, PATCH - 4);
   sourceContext.clip();
   sourceContext.drawImage(working, BORDER - x, BORDER - y);
   sourceContext.restore();
@@ -137,12 +138,21 @@ function renderPatch(point, strong) {
   if (mode !== nextMode) {
     renderer.applyStepParameterValues({
       [corruptStep]: strong
-        ? { intensity: 100, shift: 40, sort: 50, bandHeight: 24, speed: 2, seed }
-        : { intensity: 8, shift: 5, sort: 0, bandHeight: 28, speed: 1, seed },
-      [pixelsStep]: { size: strong ? BLOCK : 1 }
+        ? { intensity: 100, shift: 100, sort: 100, melt: 75, channelShift: 90, scatter: 0, bits: 20, bandHeight: 32, speed: 2, seed }
+        : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },
+      [feedbackStep]: { mix: strong ? 85 : 0 }
     });
     mode = nextMode;
   }
+  // Feedback retains corrupted pixels at this location, but starts with fresh
+  // input when the cursor moves so an old stamp cannot follow it around.
+  const nextHistory = `${nextMode}:${x}:${y}`;
+  const resetHistory = nextHistory !== historyKey;
+  if (feedbackReset !== resetHistory) {
+    renderer.applyStepParameterValues({ [feedbackStep]: { resetState: resetHistory } });
+    feedbackReset = resetHistory;
+  }
+  historyKey = nextHistory;
   // Upload after parameter updates, which can recreate engine textures.
   const uploaded = renderer.updateTextureFromSource(media.textureId, source, { flipY: false });
   if (uploaded.width !== PATCH || uploaded.height !== PATCH) {
@@ -151,13 +161,30 @@ function renderPatch(point, strong) {
   }
   renderer.render(patchTime);
   if (gpuFailed) return source;
-  checkPixels.drawImage(effectCanvas, 0, 0, 1, 1, 0, 0, 1, 1);
-  const sample = checkPixels.getImageData(0, 0, 1, 1).data;
-  if (sample[0] + sample[1] + sample[2] < 48 || sample[3] < 128) {
+  checkPixels.clearRect(0, 0, 4, 1);
+  checkPixels.drawImage(effectCanvas, 0, 0, PATCH, 1, 0, 0, 4, 1);
+  const sample = checkPixels.getImageData(0, 0, 4, 1).data;
+  let light = 0;
+  let alpha = 0;
+  for (let i = 0; i < sample.length; i += 4) {
+    light += sample[i] + sample[i + 1] + sample[i + 2];
+    alpha += sample[i + 3];
+  }
+  if (light < 48 || alpha < 128) {
     fallback(new Error('Portrait shader returned an empty patch.'));
     return source;
   }
   return effectCanvas;
+}
+
+function tearBands(patch) {
+  // A driver failure keeps the same interaction using displaced image strips.
+  for (let row = 0; row < BRUSH; row += 4) {
+    const dx = Math.round(Math.sin(patchTime * 70 + row * 1.7) * 14);
+    const dy = Math.round(Math.cos(patchTime * 50 + row * 0.4) * 5);
+    bandPixels.drawImage(patch, BORDER + dx, BORDER + row + dy, BRUSH, 4, 0, row, BRUSH, 4);
+  }
+  return bandFallback;
 }
 
 function paintPoint(point, strong) {
@@ -168,9 +195,7 @@ function paintPoint(point, strong) {
   if (strong) {
     pixels.imageSmoothingEnabled = false;
     if (gpuFailed || !media) {
-      // Keep the block interaction usable when the GPU is unavailable.
-      blockPixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, 0, 0, BRUSH / BLOCK, BRUSH / BLOCK);
-      pixels.drawImage(blockFallback, x, y, BRUSH, BRUSH);
+      pixels.drawImage(tearBands(patch), x, y);
     } else pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
     pixels.imageSmoothingEnabled = true;
     damaged = true;
@@ -240,16 +265,16 @@ async function initialize() {
         onContextLost: () => fallback(new Error('Portrait graphics context lost.'))
       });
       await renderer.loadManifest();
-      await renderer.loadEffects(['synth/media', 'filter/corrupt', 'filter/pixels']);
+      await renderer.loadEffects(['synth/media', 'filter/corrupt', 'filter/feedback']);
       const pipeline = await renderer.compile(PROGRAM);
       const step = pipeline.graph.passes.find(
         (pass) => pass.effectKey?.split(/[/.]/).at(-1) === 'corrupt')?.stepIndex;
-      const blockStep = pipeline.graph.passes.find(
-        (pass) => pass.effectKey?.split(/[/.]/).at(-1) === 'pixels')?.stepIndex;
+      const feedback = pipeline.graph.passes.find(
+        (pass) => pass.effectKey?.split(/[/.]/).at(-1) === 'feedback')?.stepIndex;
       media = renderer.getMediaSteps()[0];
-      if (!media || step === undefined || blockStep === undefined) throw new Error('Portrait patch effect steps are unavailable.');
+      if (!media || step === undefined || feedback === undefined) throw new Error('Portrait patch effect steps are unavailable.');
       corruptStep = `step_${step}`;
-      pixelsStep = `step_${blockStep}`;
+      feedbackStep = `step_${feedback}`;
       renderer.applyStepParameterValues({ [`step_${media.stepIndex}`]: { imageSize: [PATCH, PATCH] } });
       if (!gpuFailed) frame.dataset.renderer = 'noisemaker';
     } catch (error) { fallback(error); }
@@ -303,6 +328,7 @@ frame.addEventListener('click', (event) => {
 reset.addEventListener('click', () => {
   endHover();
   damaged = false;
+  historyKey = undefined;
   livePoint = [0.47, 0.35];
   frame.dataset.mosh = 'clean';
   delete frame.dataset.hit;

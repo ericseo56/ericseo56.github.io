@@ -27,7 +27,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outlin
 .intro-links { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 24px; font-size: 14px; }
 .portrait-frame { position: relative; }
 .portrait { width: 100%; height: auto; }
-.portrait-fallback { height: 100%; display: flex; justify-content: center; align-items: center; color: var(--ink); border: 1px solid var(--line); font: 80px var(--serif); }
 
 .section { padding-block: 36px 48px; }
 .section-heading { margin-bottom: 26px; }

@@ -53,8 +53,6 @@ h3 { margin: 0; }
 .contact-section { border-top: 1px solid var(--line); padding-block: 36px 48px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; }
 .contact-email { font-size: 22px; overflow-wrap: anywhere; }
 .contact-links > div { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 18px; font-size: 14px; }
-.site-footer { border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 20px; font-size: 12px; color: var(--muted); min-height: 78px; }
-.site-footer a { text-decoration: none; }
 
 @media (max-width: 1000px) {
   .shell { width: calc(100% - 64px); }
@@ -81,14 +79,13 @@ h3 { margin: 0; }
   .project-subtitle { font-size: 17px; }
   .contact-section { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-block: 28px 36px; }
   .contact-email { font-size: 21px; }
-  .site-footer { min-height: 70px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; }
 }
 @media print {
-  .contact-section, .site-footer, .profile { display: none; }
+  .contact-section, .profile { display: none; }
   .shell { width: 100%; }
   .hero { display: block; padding: 20px 0; }
   .section { padding: 25px 0; }

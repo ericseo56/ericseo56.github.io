@@ -31,6 +31,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outlin
 .hero { padding-block: 76px 64px; display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 72px; align-items: center; }
 .hero h1 { font: 400 clamp(52px, 6vw, 72px)/1.1 var(--serif); letter-spacing: -2px; margin: 0 0 24px; }
 .hero-intro { max-width: 620px; margin: 0; font-size: 18px; line-height: 1.85; }
+.hero-blurb { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
 .intro-links { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 24px; font-size: 14px; }
 .portrait-frame { aspect-ratio: 1/1.15; position: relative; overflow: hidden; background: #f3f5f5; }
 .portrait { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }

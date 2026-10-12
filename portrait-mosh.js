@@ -34,7 +34,8 @@ let visible = false;
 let request = 0;
 let lastFrame = 0;
 let time = 0;
-let pointer;
+let hoverPoint;
+let lastHoverMosh = 0;
 let previousPoint;
 let seed = 1;
 let damaged = false;
@@ -138,7 +139,7 @@ function liveFrame() {
   if (renderEffect()) output.drawImage(effectCanvas, 0, 0);
 }
 
-function dragPixels(from, to) {
+function moshPixels(from, to) {
   const width = working.width;
   const height = working.height;
   const radius = RADIUS * height / 2;
@@ -169,7 +170,7 @@ function dragPixels(from, to) {
   frame.dataset.hit = to.map((value) => value.toFixed(3)).join(',');
 }
 
-function processStroke() {
+function processTrail() {
   // Bound GPU work and interpolate sparse pointer events for an unbroken trail.
   for (let count = 0; count < 3 && pending.length && !failed; count++) {
     const target = pending[0];
@@ -181,7 +182,7 @@ function processStroke() {
     const fraction = distance > step ? step / distance : 1;
     const next = [previousPoint[0] + (target.point[0] - previousPoint[0]) * fraction,
       previousPoint[1] + (target.point[1] - previousPoint[1]) * fraction];
-    dragPixels(previousPoint, next);
+    moshPixels(previousPoint, next);
     previousPoint = next;
     target.start = false;
     if (fraction === 1) pending.shift();
@@ -197,8 +198,11 @@ function tick(now) {
     time += Math.min((now - lastFrame) / 1000, 0.1) / 8;
     lastFrame = now;
     try {
-      if (pending.length) processStroke();
-      else if (!motion.matches && pointer === undefined) liveFrame();
+      if (hoverPoint && !pending.length && now - lastHoverMosh >= 120 && !motion.matches) {
+        pending.push({ point: hoverPoint, start: true });
+      }
+      if (pending.length) { processTrail(); lastHoverMosh = now; }
+      else if (!motion.matches && !hoverPoint) liveFrame();
     } catch (error) { restorePhoto(error); }
   }
   resume();
@@ -248,34 +252,41 @@ function pointAt(event) {
     Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height))];
 }
 
+frame.addEventListener('pointerenter', (event) => {
+  if (failed || event.pointerType === 'touch') return;
+  hoverPoint = pointAt(event);
+  frame.dataset.hovering = 'true';
+  seed = seed % 99 + 1;
+  pending.push({ point: hoverPoint, start: true });
+  initialize().then(resume);
+});
+frame.addEventListener('pointermove', (event) => {
+  if (failed || event.pointerType === 'touch') return;
+  const point = pointAt(event);
+  hoverPoint = point;
+  const last = pending.at(-1)?.point || previousPoint;
+  if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) > 0.003) {
+    if (pending.length >= 6) pending.at(-1).point = point;
+    else pending.push({ point, start: !last });
+    resume();
+  }
+});
+function endHover() {
+  hoverPoint = undefined;
+  pending.length = 0;
+  previousPoint = undefined;
+  delete frame.dataset.hovering;
+  resume();
+}
+frame.addEventListener('pointerleave', endHover);
+frame.addEventListener('pointercancel', endHover);
+// Touchscreens have no hover: a tap applies the same localized effect.
 frame.addEventListener('pointerdown', (event) => {
-  if (failed || !event.isPrimary || event.button !== 0) return;
-  pointer = event.pointerId;
-  frame.setPointerCapture(pointer);
-  frame.dataset.dragging = 'true';
+  if (failed || event.pointerType !== 'touch' || !event.isPrimary) return;
   seed = seed % 99 + 1;
   pending.push({ point: pointAt(event), start: true });
   initialize().then(resume);
 });
-frame.addEventListener('pointermove', (event) => {
-  if (event.pointerId !== pointer) return;
-  const point = pointAt(event);
-  const last = pending.at(-1)?.point || previousPoint;
-  if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) > 0.003) {
-    pending.push({ point, start: false });
-    resume();
-  }
-});
-function endDrag(event) {
-  if (event.pointerId !== pointer) return;
-  pointer = undefined;
-  delete frame.dataset.dragging;
-  if (frame.hasPointerCapture(event.pointerId)) frame.releasePointerCapture(event.pointerId);
-  resume();
-}
-frame.addEventListener('pointerup', endDrag);
-frame.addEventListener('pointercancel', endDrag);
-frame.addEventListener('lostpointercapture', endDrag);
 frame.addEventListener('dragstart', (event) => event.preventDefault());
 frame.addEventListener('click', (event) => {
   if (event.detail !== 0 || failed) return;
@@ -286,9 +297,8 @@ frame.addEventListener('click', (event) => {
 reset.addEventListener('click', () => {
   pending.length = 0;
   previousPoint = undefined;
-  if (pointer !== undefined && frame.hasPointerCapture(pointer)) frame.releasePointerCapture(pointer);
-  pointer = undefined;
-  delete frame.dataset.dragging;
+  hoverPoint = undefined;
+  delete frame.dataset.hovering;
   damaged = false;
   frame.dataset.mosh = failed ? 'unavailable' : 'clean';
   delete frame.dataset.hit;

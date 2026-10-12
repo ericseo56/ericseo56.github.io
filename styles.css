@@ -20,12 +20,17 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .skip-link { position: fixed; left: 24px; top: -100px; z-index: 100; background: var(--ink); color: #fff; padding: 12px 20px; }
 .skip-link:focus { top: 12px; }
 
-.hero { padding-block: 76px 64px; display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 72px; align-items: center; }
+.hero { padding-block: 76px 64px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 72px; align-items: center; }
 .hero h1 { font: 400 clamp(52px, 6vw, 72px)/1.1 var(--serif); letter-spacing: -2px; margin: 0 0 24px; }
 .hero-intro { max-width: 620px; margin: 0; font-size: 18px; line-height: 1.85; }
 .hero-blurb { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
-.portrait-frame { position: relative; }
+.portrait-frame { --portrait-step: 18px; --portrait-trail: calc(var(--portrait-step) * 3); position: relative; isolation: isolate; padding-top: var(--portrait-trail); padding-right: var(--portrait-trail); }
 .portrait { width: 100%; height: auto; }
+.portrait-front { position: relative; z-index: 4; }
+.portrait-copy { position: absolute; width: calc(100% - var(--portrait-trail)); pointer-events: none; }
+.portrait-copy-near { bottom: var(--portrait-step); left: var(--portrait-step); z-index: 3; opacity: .6; }
+.portrait-copy-middle { bottom: calc(var(--portrait-step) * 2); left: calc(var(--portrait-step) * 2); z-index: 2; opacity: .35; }
+.portrait-copy-far { bottom: var(--portrait-trail); left: var(--portrait-trail); z-index: 1; opacity: .15; }
 
 .section { padding-block: 36px 48px; }
 .section-heading { margin-bottom: 26px; }
@@ -57,7 +62,7 @@ h3 { margin: 0; }
 
 @media (max-width: 1000px) {
   .shell { width: calc(100% - 64px); }
-  .hero { grid-template-columns: minmax(0, 1fr) 230px; gap: 40px; padding-block: 56px; }
+  .hero { grid-template-columns: minmax(0, 1fr) 260px; gap: 40px; padding-block: 56px; }
   .contact-section { grid-template-columns: 180px minmax(0, 1fr); gap: 28px; }
   .entry-heading { grid-template-columns: 180px minmax(0, 1fr) 20px; gap: 28px; }
   .entry-content { margin-left: 208px; }

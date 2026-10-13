@@ -63,6 +63,8 @@ h3 { margin: 0; }
 .entry[open] .entry-indicator::after { display: none; }
 .entry-content { margin-left: 256px; padding-bottom: 30px; }
 .entry-content > p { font-size: 16px; line-height: 1.8; margin: 0 0 20px; }
+.entry-points { margin: 0 0 24px; padding-left: 20px; line-height: 1.8; }
+.entry-points li + li { margin-top: 10px; }
 .image-placeholder { width: 100%; aspect-ratio: 3 / 2; min-height: 140px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); color: var(--muted); font-size: 14px; }
 .project-subtitle { font-size: 18px; color: var(--muted); }
 .award { color: var(--accent); margin-top: 10px; }
@@ -70,6 +72,7 @@ h3 { margin: 0; }
 
 .contact-section { border-top: 1px solid var(--line); padding-block: 36px 48px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; }
 .contact-email { font-size: 22px; overflow-wrap: anywhere; }
+.contact-location { margin: 6px 0 0; font-size: 14px; }
 .contact-links > div { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 18px; font-size: 14px; }
 
 @media (max-width: 1000px) {

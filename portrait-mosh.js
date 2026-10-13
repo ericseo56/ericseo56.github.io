@@ -18,7 +18,6 @@ const bandFallback = document.createElement('canvas');
 const bandPixels = bandFallback.getContext('2d');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
-const HOVER_REPEAT_INTERVAL = 125;
 const PATCH = 96;
 const BORDER = (PATCH - BRUSH) / 2;
 bandFallback.width = bandFallback.height = BRUSH;
@@ -43,7 +42,6 @@ let damaged = false;
 let visible = false;
 let request = 0;
 let lastFrame = 0;
-let lastHoverMosh = 0;
 let hoverPosition;
 let pendingPoint;
 let livePoint = [0.47, 0.35];
@@ -226,8 +224,8 @@ function paintPoint(point, strong) {
 function tick(now) {
   request = 0;
   if (!visible || document.hidden || !portraitReady) return;
-  const interval = pendingPoint ? frameBudget
-    : Math.max(frameBudget, hoverPosition ? HOVER_REPEAT_INTERVAL : 1000 / 12);
+  if (hoverPosition && !pendingPoint) return;
+  const interval = pendingPoint ? frameBudget : Math.max(frameBudget, 1000 / 12);
   if (now - lastFrame >= interval - 1) {
     patchTime += Math.min((now - lastFrame) / 1000, 0.15) / 8;
     lastFrame = now;
@@ -237,11 +235,7 @@ function tick(now) {
         const target = pendingPoint;
         pendingPoint = undefined;
         const point = target.position ? pointAt(target.position) : target.point;
-        if (point) { paintPoint(point, true); lastHoverMosh = now; }
-        else endHover();
-      } else if (hoverPosition && !motion.matches && now - lastHoverMosh >= HOVER_REPEAT_INTERVAL) {
-        const point = pointAt(hoverPosition);
-        if (point) { paintPoint(point, true); lastHoverMosh = now; }
+        if (point) paintPoint(point, true);
         else endHover();
       } else if (!hoverPosition && !motion.matches && !gpuFailed) paintPoint(livePoint, false);
     } catch (error) { fallback(error); }
@@ -262,7 +256,9 @@ function tick(now) {
 
 function resume() {
   if (!portraitReady || !visible || document.hidden || request) return;
-  if (!pendingPoint && (motion.matches || (gpuFailed && !hoverPosition))) return;
+  // Once the latest cursor sample is painted, a resting cursor schedules no
+  // further frames. Pointer movement resumes the loop with a fresh target.
+  if (!pendingPoint && (hoverPosition || motion.matches || gpuFailed)) return;
   request = requestAnimationFrame(tick);
 }
 
@@ -328,7 +324,11 @@ frame.addEventListener('pointerenter', (event) => {
 });
 frame.addEventListener('pointermove', (event) => {
   if (event.pointerType === 'touch') return;
-  hoverPosition = pointerPosition(event);
+  if (event.pointerType === 'mouse' && event.movementX === 0 && event.movementY === 0) return;
+  const position = pointerPosition(event);
+  if (hoverPosition && position.clientX === hoverPosition.clientX
+    && position.clientY === hoverPosition.clientY) return;
+  hoverPosition = position;
   // Keep only the latest real sample, not a queued or predicted cursor path.
   pendingPoint = { position: hoverPosition };
   resume();

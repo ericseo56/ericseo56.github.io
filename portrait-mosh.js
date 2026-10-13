@@ -413,7 +413,7 @@ async function initialize() {
   initPromise = (async () => {
     await photo.decode();
     resizePortrait();
-    trigger.disabled = false;
+    if (trigger) trigger.disabled = false;
     new ResizeObserver(resizePortrait).observe(frame);
     lastFrame = statsStart = performance.now();
     introEndsAt = lastFrame + 3000;
@@ -470,7 +470,7 @@ function tickBurst(now) {
   if (burstRemaining) burstRequest = requestAnimationFrame(tickBurst);
 }
 
-trigger.addEventListener('click', () => {
+trigger?.addEventListener('click', () => {
   if (!portraitReady) return;
   stop();
   introEndsAt = 0;

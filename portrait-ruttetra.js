@@ -258,7 +258,7 @@ trigger.addEventListener('click', async () => {
     trigger.disabled = false;
   }
 });
-mosh.addEventListener('click', () => { selection++; deactivate(); });
+mosh?.addEventListener('click', () => { selection++; deactivate(); });
 reset.addEventListener('click', () => { selection++; deactivate(); resetView(); status.hidden = true; });
 new IntersectionObserver(([entry]) => {
   visible = entry.isIntersecting;

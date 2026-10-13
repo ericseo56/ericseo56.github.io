@@ -33,19 +33,20 @@
       context.fillRect(edge.index ? width - x - w : x, y, w, h);
     };
     // Sparse horizontal fragments belong to the document, not the viewport.
-    for (let y = 24 + rng() * 35; y < height; y += 22 + rng() * 38) {
+    for (let y = 24 + rng() * 35; y < height; y += (22 + rng() * 38) * (1 - 0.65 * Math.pow(y / height, 1.7))) {
       const progress = y / height;
+      const intensity = Math.pow(progress, 1.6);
       const reach = Math.min(width, 6 + Math.max(0, width - 6) * Math.pow(progress, 1.7));
       const length = Math.max(1, Math.floor(reach * (0.35 + rng() * 0.65)));
       const offset = Math.floor(rng() * Math.min(5, width - length));
-      const thickness = rng() > 0.85 ? 2 : 1;
+      const thickness = rng() > 0.85 - 0.35 * intensity ? 2 : 1;
       let x = offset;
       const end = offset + length;
       while (x < end) {
         const w = Math.min(end - x, 2 + Math.floor(rng() * Math.max(3, length * 0.45)));
-        const opacity = 0.07 + rng() * 0.13;
+        const opacity = 0.07 + rng() * 0.13 + 0.45 * intensity;
         fragment(x, Math.round(y), w, thickness, colors[Math.floor(rng() * colors.length)], opacity);
-        if (rng() > 0.65) fragment(x + 1, Math.round(y) + 3, Math.max(1, w - 2), 1,
+        if (rng() > 0.65 - 0.35 * intensity) fragment(x + 1, Math.round(y) + 3, Math.max(1, w - 2), 1,
           colors[Math.floor(rng() * colors.length)], opacity * 0.45);
         x += w + 1 + Math.floor(rng() * 4);
       }

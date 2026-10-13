@@ -38,7 +38,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .portrait { width: 100%; height: auto; }
 .portrait-front { position: relative; z-index: 4; }
 .portrait-mosh { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
-.portrait-reset { display: block; width: 100%; margin: 12px 0 0; padding: 4px 12px; border: 0; background: transparent; color: var(--muted); font-size: 13px; text-align: center; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.portrait-reset { display: block; width: 100%; margin: 12px 0 0; padding: 4px 12px; border: 0; background: transparent; color: var(--muted); font-size: 13px; text-align: center; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; visibility: hidden; }
+.portrait-frame[data-view="ruttetra"] + .portrait-reset { visibility: visible; }
 .portrait-ruttetra { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 6; cursor: grab; touch-action: none; }
 .portrait-ruttetra:active { cursor: grabbing; }
 .portrait-frame[data-view="ruttetra"] .portrait-front { visibility: hidden; }

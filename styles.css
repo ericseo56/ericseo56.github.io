@@ -25,13 +25,19 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .hero h1 { font: 400 clamp(52px, 6vw, 72px)/1.1 var(--serif); letter-spacing: -2px; margin: 0 0 24px; }
 .hero-intro { max-width: 620px; margin: 0; font-size: 18px; line-height: 1.85; }
 .hero-blurb { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
-.portrait-heading { display: block; width: 100%; margin: 0 0 10px; padding: 4px 0; border: 0; background: transparent; font: 400 14px/1.4 var(--sans); letter-spacing: 0; color: var(--muted); text-align: center; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.portrait-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 10px; }
+.portrait-heading { display: block; margin: 0; padding: 4px 0; border: 0; background: transparent; font: 400 14px/1.4 var(--sans); letter-spacing: 0; color: var(--muted); text-align: center; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.portrait-heading[aria-pressed="true"] { text-decoration-thickness: 2px; }
 .portrait-heading:disabled { cursor: default; }
 .portrait-frame { display: block; width: 100%; position: relative; isolation: isolate; border: 0; background: transparent; user-select: none; }
 .portrait { width: 100%; height: auto; }
 .portrait-front { position: relative; z-index: 4; }
 .portrait-mosh { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
 .portrait-reset { display: block; width: 100%; margin: 12px 0 0; padding: 4px 12px; border: 0; background: transparent; color: var(--muted); font-size: 13px; text-align: center; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.portrait-ruttetra { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 6; cursor: grab; touch-action: none; }
+.portrait-ruttetra:active { cursor: grabbing; }
+.portrait-frame[data-view="ruttetra"] .portrait-front { visibility: hidden; }
+.portrait-hint { margin: 8px 0 0; color: var(--muted); font: 12px/1.6 var(--sans); text-align: center; }
 
 .section { padding-block: 36px 48px; }
 .section-heading { margin-bottom: 26px; }

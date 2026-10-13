@@ -12,6 +12,11 @@
 [hidden] { display: none !important; }
 html { scroll-behavior: smooth; scroll-padding-top: 24px; }
 body { margin: 0; background: #171717; color: var(--ink); font: 16px/1.75 var(--sans); }
+main { position: relative; z-index: 1; }
+.side-glitches { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; contain: strict; }
+.glitch-edge { position: absolute; top: 0; height: 100%; display: block; }
+.glitch-edge-left { left: 0; }
+.glitch-edge-right { right: 0; }
 a { color: inherit; text-underline-offset: 5px; text-decoration-thickness: 1px; }
 button { font: inherit; }
 img { max-width: 100%; display: block; }
@@ -99,7 +104,7 @@ h3 { margin: 0; }
   *, *::before, *::after { transition: none !important; }
 }
 @media print {
-  .contact-section, .profile { display: none; }
+  .contact-section, .profile, .side-glitches { display: none; }
   .shell { width: 100%; }
   .hero { display: block; padding: 20px 0; }
   .hero h1 { font-size: 40px; }

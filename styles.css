@@ -11,9 +11,9 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { scroll-behavior: smooth; scroll-padding-top: 24px; }
-body { margin: 0; background: #171717; color: var(--ink); font: 16px/1.75 var(--sans); }
+body { position: relative; min-height: 100vh; margin: 0; background: #171717; color: var(--ink); font: 16px/1.75 var(--sans); }
 main { position: relative; z-index: 1; }
-.side-glitches { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; contain: strict; }
+.side-glitches { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; contain: strict; }
 .glitch-edge { position: absolute; top: 0; height: 100%; display: block; }
 .glitch-edge-left { left: 0; }
 .glitch-edge-right { right: 0; }

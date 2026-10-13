@@ -18,7 +18,7 @@ const bandFallback = document.createElement('canvas');
 const bandPixels = bandFallback.getContext('2d');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
-const CORRUPTION_INTERVAL = 250;
+const HOVER_REPEAT_INTERVAL = 125;
 const PATCH = 96;
 const BORDER = (PATCH - BRUSH) / 2;
 bandFallback.width = bandFallback.height = BRUSH;
@@ -44,7 +44,7 @@ let visible = false;
 let request = 0;
 let lastFrame = 0;
 let lastHoverMosh = 0;
-let hoverPoint;
+let hoverPosition;
 let pendingPoint;
 let livePoint = [0.47, 0.35];
 let seed = 1;
@@ -222,8 +222,8 @@ function paintPoint(point, strong) {
 function tick(now) {
   request = 0;
   if (!visible || document.hidden || !portraitReady) return;
-  const interval = Math.max(frameBudget,
-    pendingPoint || hoverPoint ? CORRUPTION_INTERVAL : 1000 / 12);
+  const interval = pendingPoint ? frameBudget
+    : Math.max(frameBudget, hoverPosition ? HOVER_REPEAT_INTERVAL : 1000 / 12);
   if (now - lastFrame >= interval - 1) {
     patchTime += Math.min((now - lastFrame) / 1000, 0.15) / 8;
     lastFrame = now;
@@ -232,12 +232,14 @@ function tick(now) {
       if (pendingPoint) {
         const target = pendingPoint;
         pendingPoint = undefined;
-        paintPoint(target.point, true);
-        lastHoverMosh = now;
-      } else if (hoverPoint && !motion.matches && now - lastHoverMosh >= CORRUPTION_INTERVAL) {
-        paintPoint(hoverPoint, true);
-        lastHoverMosh = now;
-      } else if (!hoverPoint && !motion.matches && !gpuFailed) paintPoint(livePoint, false);
+        const point = target.position ? pointAt(target.position) : target.point;
+        if (point) { paintPoint(point, true); lastHoverMosh = now; }
+        else endHover();
+      } else if (hoverPosition && !motion.matches && now - lastHoverMosh >= HOVER_REPEAT_INTERVAL) {
+        const point = pointAt(hoverPosition);
+        if (point) { paintPoint(point, true); lastHoverMosh = now; }
+        else endHover();
+      } else if (!hoverPosition && !motion.matches && !gpuFailed) paintPoint(livePoint, false);
     } catch (error) { fallback(error); }
     const cost = performance.now() - began;
     // Back off on slower devices instead of building up delayed cursor work.
@@ -256,7 +258,7 @@ function tick(now) {
 
 function resume() {
   if (!portraitReady || !visible || document.hidden || request) return;
-  if (!pendingPoint && (motion.matches || (gpuFailed && !hoverPoint))) return;
+  if (!pendingPoint && (motion.matches || (gpuFailed && !hoverPosition))) return;
   request = requestAnimationFrame(tick);
 }
 
@@ -295,28 +297,40 @@ async function initialize() {
 }
 
 function pointAt(event) {
-  const bounds = frame.getBoundingClientRect();
-  return [Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
-    Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height))];
+  // Resolve viewport coordinates against the visible canvas at render time.
+  // Saved normalized coordinates become incorrect after scrolling or resizing.
+  const bounds = canvas.getBoundingClientRect();
+  const x = event.clientX - bounds.left;
+  const y = event.clientY - bounds.top;
+  if (!bounds.width || !bounds.height || x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) return;
+  return [x / bounds.width, y / bounds.height];
+}
+
+function pointerPosition(event) {
+  const samples = event.getCoalescedEvents?.();
+  let latest = samples?.length ? samples[samples.length - 1] : event;
+  if (Number.isFinite(event.timeStamp) && Number.isFinite(latest.timeStamp)
+    && event.timeStamp > latest.timeStamp) latest = event;
+  return { clientX: latest.clientX, clientY: latest.clientY };
 }
 
 frame.addEventListener('pointerenter', (event) => {
   if (event.pointerType === 'touch') return;
-  hoverPoint = pointAt(event);
+  hoverPosition = pointerPosition(event);
   frame.dataset.hovering = 'true';
   seed = seed % 99 + 1;
-  pendingPoint = { point: hoverPoint };
+  pendingPoint = { position: hoverPosition };
   initialize().then(resume);
 });
 frame.addEventListener('pointermove', (event) => {
   if (event.pointerType === 'touch') return;
-  hoverPoint = pointAt(event);
-  // Replace the old target. The render loop always follows the latest cursor.
-  pendingPoint = { point: hoverPoint };
+  hoverPosition = pointerPosition(event);
+  // Keep only the latest real sample, not a queued or predicted cursor path.
+  pendingPoint = { position: hoverPosition };
   resume();
 });
 function endHover() {
-  hoverPoint = pendingPoint = undefined;
+  hoverPosition = pendingPoint = undefined;
   delete frame.dataset.hovering;
   resume();
 }
@@ -325,7 +339,7 @@ frame.addEventListener('pointercancel', endHover);
 frame.addEventListener('pointerdown', (event) => {
   if (event.pointerType !== 'touch' || !event.isPrimary) return;
   seed = seed % 99 + 1;
-  pendingPoint = { point: pointAt(event) };
+  pendingPoint = { position: pointerPosition(event) };
   initialize().then(resume);
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());

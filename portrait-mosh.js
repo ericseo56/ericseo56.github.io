@@ -16,6 +16,8 @@ frameCheck.height = 1;
 const checkPixels = frameCheck.getContext('2d', { willReadFrequently: true });
 const bandFallback = document.createElement('canvas');
 const bandPixels = bandFallback.getContext('2d');
+const outline = document.createElement('canvas');
+const outlinePixels = outline.getContext('2d', { willReadFrequently: true });
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
 const PATCH = 96;
@@ -56,6 +58,9 @@ let statsCost = 0;
 let patchTime = 0;
 let paperColor = '#FAF7F0';
 let portraitScale = 1;
+let introEndsAt = 0;
+let introSlots = [];
+let introIndex = 0;
 
 function stop() {
   cancelAnimationFrame(request);
@@ -73,19 +78,49 @@ function fallback(error) {
   console.warn('Portrait shader unavailable; keeping pixel movement usable.', error);
 }
 
-function drawOriginal() {
+function drawLayers(context, width) {
   const bounds = frame.getBoundingClientRect();
-  const density = working.width / bounds.width;
+  const density = width / bounds.width;
+  frame.querySelectorAll('.portrait').forEach((image) => {
+    const box = image.getBoundingClientRect();
+    context.globalAlpha = Number(getComputedStyle(image).opacity);
+    context.drawImage(photo, (box.x - bounds.x) * density,
+      (box.y - bounds.y) * density, box.width * density, box.height * density);
+  });
+  context.globalAlpha = 1;
+}
+
+function drawOriginal() {
   paperColor = getComputedStyle(document.body).backgroundColor;
   pixels.fillStyle = paperColor;
   pixels.fillRect(0, 0, working.width, working.height);
-  frame.querySelectorAll('.portrait').forEach((image) => {
-    const box = image.getBoundingClientRect();
-    pixels.globalAlpha = Number(getComputedStyle(image).opacity);
-    pixels.drawImage(photo, (box.x - bounds.x) * density,
-      (box.y - bounds.y) * density, box.width * density, box.height * density);
+  drawLayers(pixels, working.width);
+}
+
+function prepareIntroEdges() {
+  // Scan a tiny transparent mask once, not the full photograph every frame.
+  outline.width = 80;
+  outline.height = Math.round(working.height / working.width * outline.width);
+  drawLayers(outlinePixels, outline.width);
+  const alpha = outlinePixels.getImageData(0, 0, outline.width, outline.height).data;
+  const solid = (x, y) => x >= 0 && y >= 0 && x < outline.width && y < outline.height
+    && alpha[(y * outline.width + x) * 4 + 3] > 10;
+  const edges = [];
+  for (let y = 1; y < outline.height; y += 2) {
+    for (let x = 1; x < outline.width; x += 2) {
+      if (solid(x, y) && (!solid(x - 2, y) || !solid(x + 2, y)
+        || !solid(x, y - 2) || !solid(x, y + 2))) edges.push([x / outline.width, y / outline.height]);
+    }
+  }
+  edges.sort((a, b) => Math.atan2(a[1] - 0.5, a[0] - 0.5) - Math.atan2(b[1] - 0.5, b[0] - 0.5));
+  const fallbackEdges = [[0.28, 0.28], [0.67, 0.16], [0.07, 0.76], [0.78, 0.77]];
+  introSlots = fallbackEdges.map((fallbackPoint, index) => {
+    const sprite = document.createElement('canvas');
+    sprite.width = sprite.height = BRUSH;
+    return { canvas: sprite, context: sprite.getContext('2d'), ready: false,
+      point: edges.length ? edges[Math.floor((index + 0.5) * edges.length / 4)] : fallbackPoint };
   });
-  pixels.globalAlpha = 1;
+  introIndex = 0;
 }
 
 function resizePortrait() {
@@ -107,6 +142,7 @@ function resizePortrait() {
   if (damaged) pixels.drawImage(previous, 0, 0, width, height);
   else drawOriginal();
   portraitReady = true;
+  prepareIntroEdges();
   showWorking();
 }
 
@@ -122,7 +158,7 @@ function brushOrigin(point, strong) {
   return strong ? [Math.round(x), Math.round(y), size] : [x, y, size];
 }
 
-function renderPatch(point, strong) {
+function renderPatch(point, strong, opening = false) {
   const [x, y] = brushOrigin(point, strong);
   // The border is a known nonblack scanline for validating GPU output. It is
   // excluded when copying the patch back, so it never appears on the portrait.
@@ -137,12 +173,14 @@ function renderPatch(point, strong) {
   sourceContext.restore();
   if (gpuFailed || !media) return source;
 
-  const nextMode = `${strong ? 'hover' : 'live'}:${seed}`;
+  const nextMode = `${strong ? 'hover' : opening ? 'opening' : 'live'}:${seed}`;
   if (mode !== nextMode) {
     renderer.applyStepParameterValues({
       [corruptStep]: strong
         ? { intensity: 100, shift: 100, sort: 100, melt: 75, channelShift: 90, scatter: 0, bits: 20, bandHeight: 32, speed: 2, seed }
-        : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },
+        : opening
+          ? { intensity: 55, shift: 65, sort: 25, melt: 0, channelShift: 10, scatter: 0, bits: 0, bandHeight: 7, speed: 2, seed }
+          : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },
       [feedbackStep]: { mix: strong ? 85 : 0 }
     });
     mode = nextMode;
@@ -196,6 +234,7 @@ function paintPoint(point, strong) {
   const patch = renderPatch(point, strong);
   const [x, y, size] = brushOrigin(point, strong);
   if (strong) {
+    introSlots.forEach((slot) => { slot.ready = false; });
     pixels.save();
     pixels.beginPath();
     pixels.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
@@ -221,11 +260,45 @@ function paintPoint(point, strong) {
   }
 }
 
+function introActive(now = performance.now()) {
+  return introEndsAt > now && introSlots.length > 0 && !motion.matches;
+}
+
+function finishIntro(now) {
+  if (!introEndsAt || now < introEndsAt) return;
+  introEndsAt = 0;
+  introSlots.forEach((slot) => { slot.ready = false; });
+  showWorking();
+  frame.dataset.intro = 'finished';
+}
+
+function paintIntro() {
+  // Update one edge patch per frame, then reuse the other three cached patches.
+  const slot = introSlots[introIndex++ % introSlots.length];
+  const patch = renderPatch(slot.point, false, true);
+  if (gpuFailed || !media) slot.context.drawImage(tearBands(patch), 0, 0);
+  else slot.context.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, 0, 0, BRUSH, BRUSH);
+  slot.ready = true;
+  showWorking();
+  for (const edge of introSlots) {
+    if (!edge.ready) continue;
+    const [x, y, size] = brushOrigin(edge.point, false);
+    output.save();
+    output.beginPath();
+    output.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    output.clip();
+    output.drawImage(edge.canvas, x, y, size, size);
+    output.restore();
+  }
+}
+
 function tick(now) {
   request = 0;
   if (!visible || document.hidden || !portraitReady) return;
-  if (hoverPosition && !pendingPoint) return;
-  const interval = pendingPoint ? frameBudget : Math.max(frameBudget, 1000 / 12);
+  finishIntro(now);
+  const opening = introActive(now);
+  if (hoverPosition && !pendingPoint && !opening) return;
+  const interval = pendingPoint || opening ? frameBudget : Math.max(frameBudget, 1000 / 12);
   if (now - lastFrame >= interval - 1) {
     patchTime += Math.min((now - lastFrame) / 1000, 0.15) / 8;
     lastFrame = now;
@@ -237,7 +310,8 @@ function tick(now) {
         const point = target.position ? pointAt(target.position) : target.point;
         if (point) paintPoint(point, true);
         else endHover();
-      } else if (!hoverPosition && !motion.matches && !gpuFailed) paintPoint(livePoint, false);
+      } else if (opening) paintIntro();
+      else if (!hoverPosition && !motion.matches && !gpuFailed) paintPoint(livePoint, false);
     } catch (error) { fallback(error); }
     const cost = performance.now() - began;
     // Back off on slower devices instead of building up delayed cursor work.
@@ -256,9 +330,10 @@ function tick(now) {
 
 function resume() {
   if (!portraitReady || !visible || document.hidden || request) return;
+  finishIntro(performance.now());
   // Once the latest cursor sample is painted, a resting cursor schedules no
   // further frames. Pointer movement resumes the loop with a fresh target.
-  if (!pendingPoint && (hoverPosition || motion.matches || gpuFailed)) return;
+  if (!pendingPoint && !introActive() && (hoverPosition || motion.matches || gpuFailed)) return;
   request = requestAnimationFrame(tick);
 }
 
@@ -268,6 +343,10 @@ async function initialize() {
     await photo.decode();
     resizePortrait();
     new ResizeObserver(resizePortrait).observe(frame);
+    lastFrame = statsStart = performance.now();
+    introEndsAt = lastFrame + 3000;
+    frame.dataset.intro = motion.matches ? 'disabled' : 'playing';
+    resume();
     try {
       const { CanvasRenderer } = await import(`${VENDOR}/core.js`);
       renderer = new CanvasRenderer({
@@ -291,6 +370,7 @@ async function initialize() {
       if (!gpuFailed) frame.dataset.renderer = 'noisemaker';
     } catch (error) { fallback(error); }
     lastFrame = statsStart = performance.now();
+    finishIntro(lastFrame);
     resume();
   })().catch(fallback);
   return initPromise;
@@ -355,6 +435,7 @@ frame.addEventListener('click', (event) => {
 });
 reset.addEventListener('click', () => {
   endHover();
+  introSlots.forEach((slot) => { slot.ready = false; });
   damaged = false;
   historyKey = undefined;
   livePoint = [0.47, 0.35];

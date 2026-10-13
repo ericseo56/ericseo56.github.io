@@ -152,7 +152,7 @@ function resizePortrait() {
 
 function showWorking() {
   output.drawImage(working, 0, 0);
-  canvas.hidden = false;
+  canvas.hidden = frame.dataset.view === 'ruttetra';
 }
 
 function brushOrigin(point, strong) {
@@ -328,7 +328,7 @@ function paintIntro() {
 
 function tick(now) {
   request = 0;
-  if (!visible || document.hidden || !portraitReady) return;
+  if (!visible || document.hidden || !portraitReady || frame.dataset.view === 'ruttetra') return;
   finishIntro(now);
   const opening = introActive(now);
   if (!opening) return;
@@ -356,7 +356,7 @@ function tick(now) {
 }
 
 function resume() {
-  if (!portraitReady || !visible || document.hidden || request) return;
+  if (!portraitReady || !visible || document.hidden || request || frame.dataset.view === 'ruttetra') return;
   finishIntro(performance.now());
   if (!introActive()) return;
   request = requestAnimationFrame(tick);
@@ -414,6 +414,14 @@ trigger.addEventListener('click', () => {
   catch (error) { fallback(error); }
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());
+frame.addEventListener('portraitviewchange', () => {
+  if (frame.dataset.view === 'ruttetra') {
+    stop();
+    introEndsAt = 0;
+    frame.dataset.intro = 'finished';
+    canvas.hidden = true;
+  } else if (portraitReady) showWorking();
+});
 reset.addEventListener('click', () => {
   stop();
   introEndsAt = 0;

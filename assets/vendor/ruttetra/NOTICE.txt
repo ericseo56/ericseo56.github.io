@@ -1,0 +1,4 @@
+Rutt-Etra-Izer by Felix Turner (airtightinteractive.com), from the user-supplied source.zip.
+Original source: http://www.airtightinteractive.com/2011/06/rutt-etra-izer/
+The portfolio adapter preserves its pixel-color and brightness-to-depth scanline technique.
+Three.js r37 bundled with that source; included unchanged and loaded only when the 3D button is pressed.

@@ -25,7 +25,7 @@ const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
 const PATCH = 96;
 const BORDER = (PATCH - BRUSH) / 2;
-const BURST_FRAMES = 20;
+const BURST_FRAMES = 1;
 const BURST_INTERVAL = 1000 / 24;
 bandFallback.width = bandFallback.height = BRUSH;
 source.width = source.height = effectCanvas.width = effectCanvas.height = PATCH;
@@ -461,6 +461,7 @@ function renderBurstFrame() {
 
 function tickBurst(now) {
   burstRequest = 0;
+  if (!burstRemaining) return;
   if (!visible || document.hidden || frame.dataset.view === 'ruttetra') { stop(); return; }
   if (now - burstLastFrame >= BURST_INTERVAL) {
     burstLastFrame = now;
@@ -480,9 +481,9 @@ trigger.addEventListener('click', () => {
   frame.dataset.burst = 'playing';
   burstLastFrame = performance.now();
   renderBurstFrame();
-  // Reduced-motion users get the same 20 accumulated passes without animation.
+  // Complete any remaining passes without animation for reduced-motion users.
   if (motion.matches) while (burstRemaining) renderBurstFrame();
-  else burstRequest = requestAnimationFrame(tickBurst);
+  else if (burstRemaining) burstRequest = requestAnimationFrame(tickBurst);
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());
 frame.addEventListener('portraitviewchange', () => {

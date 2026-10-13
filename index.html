@@ -10,9 +10,9 @@
   <meta property="og:type" content="website">
   <title>Eric's Portfolio</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
   <script src="expand.js" defer></script>
-  <script type="module" src="portrait-mosh.js?v=14"></script>
+  <script type="module" src="portrait-mosh.js?v=15"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -24,14 +24,14 @@
         <p class="hero-blurb">Learn more about my Project Team, Cornell XR, <a href="https://cornellxr.com/" target="_blank" rel="noopener noreferrer">here</a>.</p>
       </div>
       <aside class="profile" aria-label="Profile">
-        <h2 class="portrait-heading">datamosh me!</h2>
-        <button class="portrait-frame" id="portrait-frame" type="button" aria-label="Hover over Eric's portrait to distort it, or tap on a touchscreen">
+        <button class="portrait-heading" id="portrait-trigger" type="button" aria-label="Automatically datamosh Eric's portrait" aria-controls="portrait-frame" disabled>datamosh me!</button>
+        <div class="portrait-frame" id="portrait-frame">
           <img class="portrait portrait-copy portrait-copy-far" src="assets/profile-sticker.png" alt="" aria-hidden="true" width="1018" height="1545" decoding="async">
           <img class="portrait portrait-copy portrait-copy-middle" src="assets/profile-sticker.png" alt="" aria-hidden="true" width="1018" height="1545" decoding="async">
           <img class="portrait portrait-copy portrait-copy-near" src="assets/profile-sticker.png" alt="" aria-hidden="true" width="1018" height="1545" decoding="async">
           <img class="portrait portrait-front" src="assets/profile-sticker.png" alt="" role="img" aria-label="Eric Seo" width="1018" height="1545" fetchpriority="high" decoding="async">
           <canvas class="portrait-mosh" aria-hidden="true" hidden></canvas>
-        </button>
+        </div>
         <button class="portrait-reset" id="portrait-reset" type="button" aria-label="Reset portrait">Reset</button>
       </aside>
     </section>

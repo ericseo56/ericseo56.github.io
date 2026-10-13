@@ -1,6 +1,7 @@
 // Noisemaker processes a fixed-size patch; the portrait stays in a 2D bitmap.
 const VENDOR = new URL('./assets/vendor/noisemaker', import.meta.url).href;
 const frame = document.querySelector('#portrait-frame');
+const trigger = document.querySelector('#portrait-trigger');
 const reset = document.querySelector('#portrait-reset');
 const canvas = frame.querySelector('.portrait-mosh');
 const photo = frame.querySelector('.portrait-front');
@@ -44,8 +45,10 @@ let damaged = false;
 let visible = false;
 let request = 0;
 let lastFrame = 0;
-let hoverPosition;
-let pendingPoint;
+let automaticEndsAt = 0;
+let automaticPoint;
+let automaticFrames = 0;
+let portraitPoints = [];
 let livePoint = [0.47, 0.35];
 let seed = 1;
 let mode;
@@ -72,7 +75,7 @@ function fallback(error) {
   gpuFailed = true;
   mode = undefined;
   if (portraitReady) showWorking();
-  // Keep hover and Reset usable even if the graphics driver fails.
+  // Keep the controls usable even if the graphics driver fails.
   frame.dataset.renderer = '2d';
   Promise.resolve(renderer?.dispose()).catch(() => {});
   console.warn('Portrait shader unavailable; keeping pixel movement usable.', error);
@@ -106,10 +109,13 @@ function prepareIntroEdges() {
   const solid = (x, y) => x >= 0 && y >= 0 && x < outline.width && y < outline.height
     && alpha[(y * outline.width + x) * 4 + 3] > 10;
   const edges = [];
+  portraitPoints = [];
   for (let y = 1; y < outline.height; y += 2) {
     for (let x = 1; x < outline.width; x += 2) {
-      if (solid(x, y) && (!solid(x - 2, y) || !solid(x + 2, y)
-        || !solid(x, y - 2) || !solid(x, y + 2))) edges.push([x / outline.width, y / outline.height]);
+      if (!solid(x, y)) continue;
+      portraitPoints.push([x / outline.width, y / outline.height]);
+      if (!solid(x - 2, y) || !solid(x + 2, y)
+        || !solid(x, y - 2) || !solid(x, y + 2)) edges.push([x / outline.width, y / outline.height]);
     }
   }
   edges.sort((a, b) => Math.atan2(a[1] - 0.5, a[0] - 0.5) - Math.atan2(b[1] - 0.5, b[0] - 0.5));
@@ -173,7 +179,7 @@ function renderPatch(point, strong, opening = false) {
   sourceContext.restore();
   if (gpuFailed || !media) return source;
 
-  const nextMode = `${strong ? 'hover' : opening ? 'opening' : 'live'}:${seed}`;
+  const nextMode = `${strong ? 'automatic' : opening ? 'opening' : 'live'}:${seed}`;
   if (mode !== nextMode) {
     renderer.applyStepParameterValues({
       [corruptStep]: strong
@@ -186,7 +192,7 @@ function renderPatch(point, strong, opening = false) {
     mode = nextMode;
   }
   // Feedback retains corrupted pixels at this location, but starts with fresh
-  // input when the cursor moves so an old stamp cannot follow it around.
+  // input when the automatic effect moves to a different region.
   const nextHistory = `${nextMode}:${x}:${y}`;
   const resetHistory = nextHistory !== historyKey;
   if (feedbackReset !== resetHistory) {
@@ -296,25 +302,25 @@ function tick(now) {
   request = 0;
   if (!visible || document.hidden || !portraitReady) return;
   finishIntro(now);
+  if (automaticEndsAt && now >= automaticEndsAt) stopAutomatic();
   const opening = introActive(now);
-  if (hoverPosition && !pendingPoint && !opening) return;
-  const interval = pendingPoint || opening ? frameBudget : Math.max(frameBudget, 1000 / 12);
+  const interval = automaticEndsAt || opening ? frameBudget : Math.max(frameBudget, 1000 / 12);
   if (now - lastFrame >= interval - 1) {
     patchTime += Math.min((now - lastFrame) / 1000, 0.15) / 8;
     lastFrame = now;
     const began = performance.now();
     try {
-      if (pendingPoint) {
-        const target = pendingPoint;
-        pendingPoint = undefined;
-        const point = target.position ? pointAt(target.position) : target.point;
-        if (point) paintPoint(point, true);
-        else endHover();
+      if (automaticEndsAt) {
+        // Evolve each region for four frames before sampling another part of
+        // the actual portrait. Each patch becomes part of the saved bitmap.
+        if (!automaticPoint || automaticFrames % 4 === 0) automaticPoint = randomPortraitPoint();
+        automaticFrames++;
+        paintPoint(automaticPoint, true);
       } else if (opening) paintIntro();
-      else if (!hoverPosition && !motion.matches && !gpuFailed) paintPoint(livePoint, false);
+      else if (!motion.matches && !gpuFailed) paintPoint(livePoint, false);
     } catch (error) { fallback(error); }
     const cost = performance.now() - began;
-    // Back off on slower devices instead of building up delayed cursor work.
+    // Back off on slower devices; only process one patch per animation frame.
     frameBudget = Math.max(1000 / 24, Math.min(100, cost * 2));
     statsFrames++;
     statsCost += cost;
@@ -331,9 +337,7 @@ function tick(now) {
 function resume() {
   if (!portraitReady || !visible || document.hidden || request) return;
   finishIntro(performance.now());
-  // Once the latest cursor sample is painted, a resting cursor schedules no
-  // further frames. Pointer movement resumes the loop with a fresh target.
-  if (!pendingPoint && !introActive() && (hoverPosition || motion.matches || gpuFailed)) return;
+  if (!automaticEndsAt && !introActive() && (motion.matches || gpuFailed)) return;
   request = requestAnimationFrame(tick);
 }
 
@@ -342,6 +346,7 @@ async function initialize() {
   initPromise = (async () => {
     await photo.decode();
     resizePortrait();
+    trigger.disabled = false;
     new ResizeObserver(resizePortrait).observe(frame);
     lastFrame = statsStart = performance.now();
     introEndsAt = lastFrame + 3000;
@@ -376,65 +381,42 @@ async function initialize() {
   return initPromise;
 }
 
-function pointAt(event) {
-  // Resolve viewport coordinates against the visible canvas at render time.
-  // Saved normalized coordinates become incorrect after scrolling or resizing.
-  const bounds = canvas.getBoundingClientRect();
-  const x = event.clientX - bounds.left;
-  const y = event.clientY - bounds.top;
-  if (!bounds.width || !bounds.height || x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) return;
-  return [x / bounds.width, y / bounds.height];
+function randomPortraitPoint() {
+  return portraitPoints.length
+    ? portraitPoints[Math.floor(Math.random() * portraitPoints.length)]
+    : [0.47, 0.35];
 }
 
-function pointerPosition(event) {
-  const samples = event.getCoalescedEvents?.();
-  let latest = samples?.length ? samples[samples.length - 1] : event;
-  if (Number.isFinite(event.timeStamp) && Number.isFinite(latest.timeStamp)
-    && event.timeStamp > latest.timeStamp) latest = event;
-  return { clientX: latest.clientX, clientY: latest.clientY };
+function stopAutomatic() {
+  automaticEndsAt = 0;
+  automaticFrames = 0;
+  automaticPoint = undefined;
+  frame.dataset.automatic = 'stopped';
 }
 
-frame.addEventListener('pointerenter', (event) => {
-  if (event.pointerType === 'touch') return;
-  hoverPosition = pointerPosition(event);
-  frame.dataset.hovering = 'true';
+trigger.addEventListener('click', () => {
+  if (!portraitReady) return;
+  stopAutomatic();
+  introEndsAt = 0;
+  frame.dataset.intro = 'finished';
   seed = seed % 99 + 1;
-  pendingPoint = { position: hoverPosition };
-  initialize().then(resume);
-});
-frame.addEventListener('pointermove', (event) => {
-  if (event.pointerType === 'touch') return;
-  if (event.pointerType === 'mouse' && event.movementX === 0 && event.movementY === 0) return;
-  const position = pointerPosition(event);
-  if (hoverPosition && position.clientX === hoverPosition.clientX
-    && position.clientY === hoverPosition.clientY) return;
-  hoverPosition = position;
-  // Keep only the latest real sample, not a queued or predicted cursor path.
-  pendingPoint = { position: hoverPosition };
+  if (motion.matches) {
+    // An explicit click still corrupts the image without playing an animation.
+    try { paintPoint(randomPortraitPoint(), true); }
+    catch (error) { fallback(error); }
+    return;
+  }
+  lastFrame = performance.now();
+  automaticEndsAt = lastFrame + 3000;
+  frame.dataset.automatic = 'playing';
   resume();
-});
-function endHover() {
-  hoverPosition = pendingPoint = undefined;
-  delete frame.dataset.hovering;
-  resume();
-}
-frame.addEventListener('pointerleave', endHover);
-frame.addEventListener('pointercancel', endHover);
-frame.addEventListener('pointerdown', (event) => {
-  if (event.pointerType !== 'touch' || !event.isPrimary) return;
-  seed = seed % 99 + 1;
-  pendingPoint = { position: pointerPosition(event) };
-  initialize().then(resume);
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());
-frame.addEventListener('click', (event) => {
-  if (event.detail !== 0) return;
-  seed = seed % 99 + 1;
-  pendingPoint = { point: [0.5, 0.35] };
-  initialize().then(resume);
-});
 reset.addEventListener('click', () => {
-  endHover();
+  stopAutomatic();
+  stop();
+  introEndsAt = 0;
+  frame.dataset.intro = 'finished';
   introSlots.forEach((slot) => { slot.ready = false; });
   damaged = false;
   historyKey = undefined;
@@ -442,18 +424,22 @@ reset.addEventListener('click', () => {
   frame.dataset.mosh = 'clean';
   delete frame.dataset.hit;
   if (portraitReady) { drawOriginal(); showWorking(); }
+  resume();
 });
 new IntersectionObserver(([entry]) => {
   visible = entry.isIntersecting;
   if (visible) initialize().then(resume);
-  else { endHover(); stop(); }
+  else { stopAutomatic(); stop(); }
 }, { threshold: 0.05 }).observe(frame);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { endHover(); stop(); }
+  if (document.hidden) { stopAutomatic(); stop(); }
   else { lastFrame = performance.now(); resume(); }
 });
 motion.addEventListener('change', () => {
   stop();
-  if (motion.matches && portraitReady) showWorking();
+  if (motion.matches) {
+    stopAutomatic();
+    if (portraitReady) showWorking();
+  }
   resume();
 });

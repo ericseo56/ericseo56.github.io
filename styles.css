@@ -27,13 +27,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .hero-blurb { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
 .portrait-heading { display: block; width: calc(100% - 54px); margin: 0 0 10px; padding: 4px 0; border: 0; background: transparent; font: 400 14px/1.4 var(--sans); letter-spacing: 0; color: var(--muted); text-align: center; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 .portrait-heading:disabled { cursor: default; }
-.portrait-frame { --portrait-step: 18px; --portrait-trail: calc(var(--portrait-step) * 3); display: block; width: 100%; position: relative; isolation: isolate; border: 0; background: transparent; padding: var(--portrait-trail) var(--portrait-trail) 0 0; user-select: none; }
+.portrait-frame { display: block; width: 100%; position: relative; isolation: isolate; border: 0; background: transparent; user-select: none; }
 .portrait { width: 100%; height: auto; }
 .portrait-front { position: relative; z-index: 4; }
-.portrait-copy { position: absolute; width: calc(100% - var(--portrait-trail)); pointer-events: none; }
-.portrait-copy-near { bottom: var(--portrait-step); left: var(--portrait-step); z-index: 3; opacity: .6; }
-.portrait-copy-middle { bottom: calc(var(--portrait-step) * 2); left: calc(var(--portrait-step) * 2); z-index: 2; opacity: .35; }
-.portrait-copy-far { bottom: var(--portrait-trail); left: var(--portrait-trail); z-index: 1; opacity: .15; }
 .portrait-mosh { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
 .portrait-reset { display: block; width: calc(100% - 54px); margin: 12px 0 0; padding: 4px 12px; border: 0; background: transparent; color: var(--muted); font-size: 13px; text-align: center; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 

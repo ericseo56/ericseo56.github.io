@@ -1,4 +1,4 @@
-// Noisemaker processes a fixed-size patch; the portrait stays in a 2D bitmap.
+// Noisemaker corrupts the whole portrait; small patches animate the idle edges.
 const VENDOR = new URL('./assets/vendor/noisemaker', import.meta.url).href;
 const frame = document.querySelector('#portrait-frame');
 const trigger = document.querySelector('#portrait-trigger');
@@ -19,6 +19,8 @@ const bandFallback = document.createElement('canvas');
 const bandPixels = bandFallback.getContext('2d');
 const outline = document.createElement('canvas');
 const outlinePixels = outline.getContext('2d', { willReadFrequently: true });
+const original = document.createElement('canvas');
+const originalPixels = original.getContext('2d');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
 const PATCH = 96;
@@ -46,9 +48,6 @@ let visible = false;
 let request = 0;
 let lastFrame = 0;
 let automaticEndsAt = 0;
-let automaticPoint;
-let automaticFrames = 0;
-let portraitPoints = [];
 let livePoint = [0.47, 0.35];
 let seed = 1;
 let mode;
@@ -95,9 +94,12 @@ function drawLayers(context, width) {
 
 function drawOriginal() {
   paperColor = getComputedStyle(document.body).backgroundColor;
-  pixels.fillStyle = paperColor;
-  pixels.fillRect(0, 0, working.width, working.height);
-  drawLayers(pixels, working.width);
+  original.width = working.width;
+  original.height = working.height;
+  originalPixels.fillStyle = paperColor;
+  originalPixels.fillRect(0, 0, original.width, original.height);
+  drawLayers(originalPixels, original.width);
+  pixels.drawImage(original, 0, 0);
 }
 
 function prepareIntroEdges() {
@@ -109,11 +111,9 @@ function prepareIntroEdges() {
   const solid = (x, y) => x >= 0 && y >= 0 && x < outline.width && y < outline.height
     && alpha[(y * outline.width + x) * 4 + 3] > 10;
   const edges = [];
-  portraitPoints = [];
   for (let y = 1; y < outline.height; y += 2) {
     for (let x = 1; x < outline.width; x += 2) {
       if (!solid(x, y)) continue;
-      portraitPoints.push([x / outline.width, y / outline.height]);
       if (!solid(x - 2, y) || !solid(x + 2, y)
         || !solid(x, y - 2) || !solid(x, y + 2)) edges.push([x / outline.width, y / outline.height]);
     }
@@ -145,8 +145,8 @@ function resizePortrait() {
   working.width = canvas.width = width;
   working.height = canvas.height = height;
   portraitScale = width / bounds.width;
+  drawOriginal();
   if (damaged) pixels.drawImage(previous, 0, 0, width, height);
-  else drawOriginal();
   portraitReady = true;
   prepareIntroEdges();
   showWorking();
@@ -166,34 +166,57 @@ function brushOrigin(point, strong) {
 
 function renderPatch(point, strong, opening = false) {
   const [x, y] = brushOrigin(point, strong);
+  const fullWidth = Math.min(working.width, 480);
+  const width = strong ? fullWidth + 4 : PATCH;
+  const height = strong ? Math.round(working.height * fullWidth / working.width) + 4 : PATCH;
+  if (source.width !== width || source.height !== height) {
+    source.width = width;
+    source.height = height;
+    mode = historyKey = feedbackReset = undefined;
+  }
   // The border is a known nonblack scanline for validating GPU output. It is
   // excluded when copying the patch back, so it never appears on the portrait.
   sourceContext.fillStyle = paperColor;
-  sourceContext.fillRect(0, 0, PATCH, PATCH);
+  sourceContext.fillRect(0, 0, width, height);
   sourceContext.save();
   sourceContext.beginPath();
-  sourceContext.rect(2, 2, PATCH - 4, PATCH - 4);
+  sourceContext.rect(2, 2, width - 4, height - 4);
   sourceContext.clip();
-  sourceContext.drawImage(working, BORDER - x / portraitScale, BORDER - y / portraitScale,
+  if (strong) {
+    sourceContext.drawImage(working, 2, 2, width - 4, height - 4);
+    // Feed some original detail back into every full-image pass so repeated
+    // corruption keeps image structure instead of converging to a flat color.
+    sourceContext.globalAlpha = 0.25;
+    sourceContext.drawImage(original, 2, 2, width - 4, height - 4);
+    sourceContext.globalAlpha = 1;
+  }
+  else sourceContext.drawImage(working, BORDER - x / portraitScale, BORDER - y / portraitScale,
     working.width / portraitScale, working.height / portraitScale);
   sourceContext.restore();
   if (gpuFailed || !media) return source;
+  if (effectCanvas.width !== width || effectCanvas.height !== height) {
+    effectCanvas.width = width;
+    effectCanvas.height = height;
+    renderer.resize(width, height);
+    mode = historyKey = feedbackReset = undefined;
+  }
 
   const nextMode = `${strong ? 'automatic' : opening ? 'opening' : 'live'}:${seed}`;
   if (mode !== nextMode) {
     renderer.applyStepParameterValues({
       [corruptStep]: strong
-        ? { intensity: 100, shift: 100, sort: 100, melt: 75, channelShift: 90, scatter: 0, bits: 20, bandHeight: 32, speed: 2, seed }
+        ? { intensity: 100, shift: 85, sort: 45, melt: 25, channelShift: 65, scatter: 0, bits: 10, bandHeight: 18, speed: 2, seed }
         : opening
           ? { intensity: 55, shift: 65, sort: 25, melt: 0, channelShift: 10, scatter: 0, bits: 0, bandHeight: 7, speed: 2, seed }
           : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },
-      [feedbackStep]: { mix: strong ? 85 : 0 }
+      [feedbackStep]: { mix: strong ? 55 : 0 },
+      [`step_${media.stepIndex}`]: { imageSize: [width, height] }
     });
     mode = nextMode;
   }
   // Feedback retains corrupted pixels at this location, but starts with fresh
   // input when the automatic effect moves to a different region.
-  const nextHistory = `${nextMode}:${x}:${y}`;
+  const nextHistory = strong ? `${nextMode}:full` : `${nextMode}:${x}:${y}`;
   const resetHistory = nextHistory !== historyKey;
   if (feedbackReset !== resetHistory) {
     renderer.applyStepParameterValues({ [feedbackStep]: { resetState: resetHistory } });
@@ -202,14 +225,14 @@ function renderPatch(point, strong, opening = false) {
   historyKey = nextHistory;
   // Upload after parameter updates, which can recreate engine textures.
   const uploaded = renderer.updateTextureFromSource(media.textureId, source, { flipY: false });
-  if (uploaded.width !== PATCH || uploaded.height !== PATCH) {
+  if (uploaded.width !== width || uploaded.height !== height) {
     fallback(new Error('Portrait patch texture did not upload.'));
     return source;
   }
   renderer.render(patchTime);
   if (gpuFailed) return source;
   checkPixels.clearRect(0, 0, 4, 1);
-  checkPixels.drawImage(effectCanvas, 0, 0, PATCH, 1, 0, 0, 4, 1);
+  checkPixels.drawImage(effectCanvas, 0, 0, width, 1, 0, 0, 4, 1);
   const sample = checkPixels.getImageData(0, 0, 4, 1).data;
   let light = 0;
   let alpha = 0;
@@ -241,19 +264,28 @@ function paintPoint(point, strong) {
   const [x, y, size] = brushOrigin(point, strong);
   if (strong) {
     introSlots.forEach((slot) => { slot.ready = false; });
-    pixels.save();
-    pixels.beginPath();
-    pixels.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-    pixels.clip();
-    pixels.imageSmoothingEnabled = false;
+    pixels.imageSmoothingEnabled = true;
     if (gpuFailed || !media) {
-      pixels.drawImage(tearBands(patch), x, y, size, size);
-    } else pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, size, size);
-    pixels.restore();
+      // Displace strips across the full image if GPU processing is unavailable.
+      const width = source.width - 4;
+      const height = source.height - 4;
+      for (let row = 0; row < height; row += 8) {
+        const band = Math.min(8, height - row);
+        const shift = Math.round(Math.sin(patchTime * 70 + row * 1.7) * width * 0.12);
+        const offset = (shift + width) % width;
+        const y = row / height * working.height;
+        const h = band / height * working.height;
+        pixels.drawImage(patch, 2 + offset, 2 + row, width - offset, band,
+          0, y, (width - offset) / width * working.width, h);
+        if (offset) pixels.drawImage(patch, 2, 2 + row, offset, band,
+          (width - offset) / width * working.width, y, offset / width * working.width, h);
+      }
+    } else pixels.drawImage(patch, 2, 2, source.width - 4, source.height - 4,
+      0, 0, working.width, working.height);
     damaged = true;
     livePoint = point;
     frame.dataset.mosh = 'damaged';
-    frame.dataset.hit = point.map((value) => value.toFixed(3)).join(',');
+    frame.dataset.hit = 'full';
     showWorking();
   } else {
     showWorking();
@@ -311,11 +343,7 @@ function tick(now) {
     const began = performance.now();
     try {
       if (automaticEndsAt) {
-        // Evolve each region for four frames before sampling another part of
-        // the actual portrait. Each patch becomes part of the saved bitmap.
-        if (!automaticPoint || automaticFrames % 4 === 0) automaticPoint = randomPortraitPoint();
-        automaticFrames++;
-        paintPoint(automaticPoint, true);
+        paintPoint([0.5, 0.5], true);
       } else if (opening) paintIntro();
       else if (!motion.matches && !gpuFailed) paintPoint(livePoint, false);
     } catch (error) { fallback(error); }
@@ -381,16 +409,8 @@ async function initialize() {
   return initPromise;
 }
 
-function randomPortraitPoint() {
-  return portraitPoints.length
-    ? portraitPoints[Math.floor(Math.random() * portraitPoints.length)]
-    : [0.47, 0.35];
-}
-
 function stopAutomatic() {
   automaticEndsAt = 0;
-  automaticFrames = 0;
-  automaticPoint = undefined;
   frame.dataset.automatic = 'stopped';
 }
 
@@ -402,7 +422,7 @@ trigger.addEventListener('click', () => {
   seed = seed % 99 + 1;
   if (motion.matches) {
     // An explicit click still corrupts the image without playing an animation.
-    try { paintPoint(randomPortraitPoint(), true); }
+    try { paintPoint([0.5, 0.5], true); }
     catch (error) { fallback(error); }
     return;
   }

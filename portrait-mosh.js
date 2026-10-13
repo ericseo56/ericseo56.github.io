@@ -208,20 +208,17 @@ function renderPatch(point, strong, opening = false) {
 
   const nextMode = `${strong ? 'single' : opening ? 'opening' : 'live'}:${seed}`;
   if (mode !== nextMode) {
-    // The first few clicks are gentle; later clicks increasingly destroy
-    // structure, with no original-image blend to undo previous passes.
-    const decay = Math.min(1, Math.max(0, (clickCount - 3) / 22));
+    // Use the original cursor effect on the full image for every burst pass.
     renderer.applyStepParameterValues({
       [corruptStep]: strong
-        ? { intensity: 28 + 62 * decay, shift: 12 + 73 * decay, sort: 14 * decay,
-          melt: 0, channelShift: 0, scatter: 8 * decay,
-          bits: 0, bandHeight: 18 - 10 * decay, speed: 1, seed }
+        ? { intensity: 100, shift: 100, sort: 100, melt: 75, channelShift: 90,
+          scatter: 0, bits: 20, bandHeight: 32, speed: 2, seed }
         : opening
           ? { intensity: 55, shift: 65, sort: 25, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 7, speed: 2, seed }
           : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },
       [feedbackStep]: strong
-        ? { mix: 20 + 25 * decay, blendMode: 10, scaleAmt: 100,
-          rotation: 0, aberration: 0, distortion: 0 }
+        ? { mix: 85, blendMode: 10, scaleAmt: 108,
+          rotation: 1.5, aberration: 65, distortion: 12 }
         : { mix: 0 },
       [`step_${media.stepIndex}`]: { imageSize: [width, height] }
     });
@@ -315,8 +312,7 @@ function paintPoint(point, strong) {
       const height = source.height - 4;
       for (let row = 0; row < height; row += 8) {
         const band = Math.min(8, height - row);
-        const decay = Math.min(1, Math.max(0, (clickCount - 3) / 22));
-        const shift = Math.round(Math.sin(patchTime * 70 + row * 1.7) * width * (0.02 + 0.13 * decay));
+        const shift = Math.round(Math.sin(patchTime * 70 + row * 1.7) * width * 0.15);
         const offset = (shift + width) % width;
         const y = row / height * working.height;
         const h = band / height * working.height;

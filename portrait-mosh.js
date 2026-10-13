@@ -25,13 +25,15 @@ const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
 const PATCH = 96;
 const BORDER = (PATCH - BRUSH) / 2;
+const BURST_FRAMES = 20;
+const BURST_INTERVAL = 1000 / 24;
 bandFallback.width = bandFallback.height = BRUSH;
 source.width = source.height = effectCanvas.width = effectCanvas.height = PATCH;
 const PROGRAM = `
 search synth, filter
 media()
   .corrupt(intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1)
-  .feedback(mix: 0, scaleAmt: 108, rotation: 1.5, aberration: 65, distortion: 12, blendMode: mix)
+  .feedback(mix: 0, scaleAmt: 100, rotation: 0, aberration: 0, distortion: 0, blendMode: mix)
   .write(o0)
 render(o0)
 `;
@@ -49,6 +51,10 @@ let request = 0;
 let lastFrame = 0;
 let seed = 1;
 let clickCount = 0;
+let passCount = 0;
+let burstRequest = 0;
+let burstRemaining = 0;
+let burstLastFrame = 0;
 let mode;
 let historyKey;
 let feedbackReset;
@@ -65,7 +71,10 @@ let introIndex = 0;
 
 function stop() {
   cancelAnimationFrame(request);
+  cancelAnimationFrame(burstRequest);
   request = 0;
+  burstRequest = burstRemaining = 0;
+  frame.dataset.burst = 'idle';
 }
 
 function fallback(error) {
@@ -205,14 +214,14 @@ function renderPatch(point, strong, opening = false) {
     renderer.applyStepParameterValues({
       [corruptStep]: strong
         ? { intensity: 28 + 62 * decay, shift: 12 + 73 * decay, sort: 14 * decay,
-          melt: 12 * decay, channelShift: 22 + 63 * decay, scatter: 8 * decay,
+          melt: 0, channelShift: 0, scatter: 8 * decay,
           bits: 0, bandHeight: 18 - 10 * decay, speed: 1, seed }
         : opening
-          ? { intensity: 55, shift: 65, sort: 25, melt: 0, channelShift: 10, scatter: 0, bits: 0, bandHeight: 7, speed: 2, seed }
+          ? { intensity: 55, shift: 65, sort: 25, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 7, speed: 2, seed }
           : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },
       [feedbackStep]: strong
-        ? { mix: 20 + 25 * decay, scaleAmt: 103 + 5 * decay,
-          rotation: 0.5 + decay, aberration: 25 + 25 * decay, distortion: 2 + 6 * decay }
+        ? { mix: 20 + 25 * decay, blendMode: 10, scaleAmt: 100,
+          rotation: 0, aberration: 0, distortion: 0 }
         : { mix: 0 },
       [`step_${media.stepIndex}`]: { imageSize: [width, height] }
     });
@@ -261,6 +270,37 @@ function tearBands(patch) {
   return bandFallback;
 }
 
+function paintColorPixels() {
+  const decay = Math.min(1, Math.max(0, (clickCount - 3) / 22));
+  const size = Math.max(1, Math.round(portraitScale));
+  const count = Math.ceil(working.width * working.height / (size * size) * (0.002 + 0.01 * decay) / 3);
+  let state = Math.imul(passCount, 2654435761) >>> 0;
+  const random = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  pixels.save();
+  pixels.globalAlpha = 1;
+  // Preserve the page's background brightness without restoring image detail.
+  // Feedback stays aligned: moving corruption leaves trails without sampling
+  // black outside the image or growing to white through a lighten blend.
+  pixels.globalCompositeOperation = 'lighten';
+  pixels.fillStyle = paperColor;
+  pixels.fillRect(0, 0, working.width, working.height);
+  pixels.globalCompositeOperation = 'source-over';
+  for (const color of ['#ff0000', '#00ff00', '#0000ff']) {
+    pixels.fillStyle = color;
+    pixels.beginPath();
+    for (let point = 0; point < count; point++) {
+      const x = Math.floor(random() * Math.ceil(working.width / size)) * size;
+      const y = Math.floor(random() * Math.ceil(working.height / size)) * size;
+      pixels.rect(x, y, size, size);
+    }
+    pixels.fill();
+  }
+  pixels.restore();
+}
+
 function paintPoint(point, strong) {
   // Sample the current location in the edited bitmap on every render. Carrying
   // the previous brush image forward would repeat the first patch indefinitely.
@@ -287,6 +327,8 @@ function paintPoint(point, strong) {
       }
     } else pixels.drawImage(patch, 2, 2, source.width - 4, source.height - 4,
       0, 0, working.width, working.height);
+    // These edits enter the saved bitmap and move with every subsequent pass.
+    paintColorPixels();
     damaged = true;
     frame.dataset.mosh = 'damaged';
     frame.dataset.hit = 'full';
@@ -410,18 +452,41 @@ async function initialize() {
   return initPromise;
 }
 
+function renderBurstFrame() {
+  seed = seed % 99 + 1;
+  passCount++;
+  patchTime += 0.1;
+  try { paintPoint([0.5, 0.5], true); }
+  catch (error) { fallback(error); }
+  burstRemaining--;
+  frame.dataset.burstFrames = String(BURST_FRAMES - burstRemaining);
+  if (!burstRemaining) frame.dataset.burst = 'finished';
+}
+
+function tickBurst(now) {
+  burstRequest = 0;
+  if (!visible || document.hidden || frame.dataset.view === 'ruttetra') { stop(); return; }
+  if (now - burstLastFrame >= BURST_INTERVAL) {
+    burstLastFrame = now;
+    renderBurstFrame();
+  }
+  if (burstRemaining) burstRequest = requestAnimationFrame(tickBurst);
+}
+
 trigger.addEventListener('click', () => {
   if (!portraitReady) return;
   stop();
   introEndsAt = 0;
   frame.dataset.intro = 'finished';
-  seed = seed % 99 + 1;
   clickCount++;
   frame.dataset.clicks = String(clickCount);
-  patchTime += 0.1;
-  // One click applies one full-image pass. No follow-up frames are scheduled.
-  try { paintPoint([0.5, 0.5], true); }
-  catch (error) { fallback(error); }
+  burstRemaining = BURST_FRAMES;
+  frame.dataset.burst = 'playing';
+  burstLastFrame = performance.now();
+  renderBurstFrame();
+  // Reduced-motion users get the same 20 accumulated passes without animation.
+  if (motion.matches) while (burstRemaining) renderBurstFrame();
+  else burstRequest = requestAnimationFrame(tickBurst);
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());
 frame.addEventListener('portraitviewchange', () => {
@@ -439,10 +504,12 @@ reset.addEventListener('click', () => {
   introSlots.forEach((slot) => { slot.ready = false; });
   damaged = false;
   clickCount = 0;
+  passCount = 0;
   seed = 1;
   patchTime = 0;
   mode = historyKey = feedbackReset = undefined;
   frame.dataset.clicks = '0';
+  frame.dataset.burstFrames = '0';
   frame.dataset.mosh = 'clean';
   delete frame.dataset.hit;
   if (portraitReady) { drawOriginal(); showWorking(); }

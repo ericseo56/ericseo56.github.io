@@ -57,6 +57,7 @@ let statsFrames = 0;
 let statsCost = 0;
 let patchTime = 0;
 let paperColor = '#FAF7F0';
+let portraitScale = 1;
 
 function stop() {
   cancelAnimationFrame(request);
@@ -91,8 +92,8 @@ function drawOriginal() {
 
 function resizePortrait() {
   const bounds = frame.getBoundingClientRect();
-  // The effect is deliberately independent of device pixel ratio.
-  const density = Math.min(1, 320 / bounds.width);
+  // Render the photograph at 2x resolution; the shader patch stays 96x96.
+  const density = Math.min(2, 640 / bounds.width);
   const width = Math.round(bounds.width * density);
   const height = Math.round(bounds.height * density);
   if (!width || !height || (portraitReady && working.width === width && working.height === height)) return;
@@ -104,6 +105,7 @@ function resizePortrait() {
   }
   working.width = canvas.width = width;
   working.height = canvas.height = height;
+  portraitScale = width / bounds.width;
   if (damaged) pixels.drawImage(previous, 0, 0, width, height);
   else drawOriginal();
   portraitReady = true;
@@ -116,9 +118,10 @@ function showWorking() {
 }
 
 function brushOrigin(point, strong) {
-  const x = point[0] * working.width - BRUSH / 2;
-  const y = point[1] * working.height - BRUSH / 2;
-  return strong ? [Math.round(x), Math.round(y)] : [x, y];
+  const size = BRUSH * portraitScale;
+  const x = point[0] * working.width - size / 2;
+  const y = point[1] * working.height - size / 2;
+  return strong ? [Math.round(x), Math.round(y), size] : [x, y, size];
 }
 
 function renderPatch(point, strong) {
@@ -131,7 +134,8 @@ function renderPatch(point, strong) {
   sourceContext.beginPath();
   sourceContext.rect(2, 2, PATCH - 4, PATCH - 4);
   sourceContext.clip();
-  sourceContext.drawImage(working, BORDER - x, BORDER - y);
+  sourceContext.drawImage(working, BORDER - x / portraitScale, BORDER - y / portraitScale,
+    working.width / portraitScale, working.height / portraitScale);
   sourceContext.restore();
   if (gpuFailed || !media) return source;
 
@@ -192,16 +196,16 @@ function paintPoint(point, strong) {
   // Sample the current location in the edited bitmap on every render. Carrying
   // the previous brush image forward would repeat the first patch indefinitely.
   const patch = renderPatch(point, strong);
-  const [x, y] = brushOrigin(point, strong);
+  const [x, y, size] = brushOrigin(point, strong);
   if (strong) {
     pixels.save();
     pixels.beginPath();
-    pixels.arc(x + BRUSH / 2, y + BRUSH / 2, BRUSH / 2, 0, Math.PI * 2);
+    pixels.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
     pixels.clip();
     pixels.imageSmoothingEnabled = false;
     if (gpuFailed || !media) {
-      pixels.drawImage(tearBands(patch), x, y);
-    } else pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
+      pixels.drawImage(tearBands(patch), x, y, size, size);
+    } else pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, size, size);
     pixels.restore();
     damaged = true;
     livePoint = point;
@@ -212,9 +216,9 @@ function paintPoint(point, strong) {
     showWorking();
     output.save();
     output.beginPath();
-    output.arc(x + BRUSH / 2, y + BRUSH / 2, BRUSH / 2, 0, Math.PI * 2);
+    output.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
     output.clip();
-    output.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
+    output.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, size, size);
     output.restore();
   }
 }

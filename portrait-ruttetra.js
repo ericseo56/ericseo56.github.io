@@ -5,7 +5,6 @@ const photo = frame.querySelector('.portrait-front');
 const trigger = document.querySelector('#portrait-ruttetra-trigger');
 const reset = document.querySelector('#portrait-reset');
 const mosh = document.querySelector('#portrait-trigger');
-const hint = document.querySelector('#portrait-ruttetra-hint');
 const status = document.querySelector('#portrait-ruttetra-status');
 const pointers = new Map();
 let THREE, renderer, scene, camera, holder, surface, ready;
@@ -193,7 +192,6 @@ async function initialize() {
     surface.tabIndex = 0;
     surface.setAttribute('role', 'img');
     surface.setAttribute('aria-label', 'Interactive 3D Rutt Etra portrait. Arrow keys rotate, Shift and arrows move, plus and minus zoom, zero resets the view.');
-    surface.setAttribute('aria-describedby', hint.id);
     surface.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
       deactivate();
@@ -229,7 +227,6 @@ function deactivate() {
   pointers.clear();
   drag = undefined;
   if (surface) surface.hidden = true;
-  hint.hidden = true;
   trigger.setAttribute('aria-pressed', 'false');
   if (frame.dataset.view === 'ruttetra') setView('portrait');
 }
@@ -248,7 +245,6 @@ trigger.addEventListener('click', async () => {
     active = true;
     setView('ruttetra');
     surface.hidden = false;
-    hint.hidden = false;
     trigger.setAttribute('aria-pressed', 'true');
     resize();
   } catch (error) {

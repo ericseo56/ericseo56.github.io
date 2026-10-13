@@ -18,6 +18,7 @@ const bandFallback = document.createElement('canvas');
 const bandPixels = bandFallback.getContext('2d');
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const BRUSH = 48;
+const CORRUPTION_INTERVAL = 250;
 const PATCH = 96;
 const BORDER = (PATCH - BRUSH) / 2;
 bandFallback.width = bandFallback.height = BRUSH;
@@ -193,11 +194,15 @@ function paintPoint(point, strong) {
   const patch = renderPatch(point, strong);
   const [x, y] = brushOrigin(point, strong);
   if (strong) {
+    pixels.save();
+    pixels.beginPath();
+    pixels.arc(x + BRUSH / 2, y + BRUSH / 2, BRUSH / 2, 0, Math.PI * 2);
+    pixels.clip();
     pixels.imageSmoothingEnabled = false;
     if (gpuFailed || !media) {
       pixels.drawImage(tearBands(patch), x, y);
     } else pixels.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
-    pixels.imageSmoothingEnabled = true;
+    pixels.restore();
     damaged = true;
     livePoint = point;
     frame.dataset.mosh = 'damaged';
@@ -205,15 +210,20 @@ function paintPoint(point, strong) {
     showWorking();
   } else {
     showWorking();
+    output.save();
+    output.beginPath();
+    output.arc(x + BRUSH / 2, y + BRUSH / 2, BRUSH / 2, 0, Math.PI * 2);
+    output.clip();
     output.drawImage(patch, BORDER, BORDER, BRUSH, BRUSH, x, y, BRUSH, BRUSH);
+    output.restore();
   }
 }
 
 function tick(now) {
   request = 0;
   if (!visible || document.hidden || !portraitReady) return;
-  const interval = pendingPoint ? frameBudget
-    : Math.max(frameBudget, hoverPoint ? 125 : 1000 / 12);
+  const interval = Math.max(frameBudget,
+    pendingPoint || hoverPoint ? CORRUPTION_INTERVAL : 1000 / 12);
   if (now - lastFrame >= interval - 1) {
     patchTime += Math.min((now - lastFrame) / 1000, 0.15) / 8;
     lastFrame = now;
@@ -224,7 +234,7 @@ function tick(now) {
         pendingPoint = undefined;
         paintPoint(target.point, true);
         lastHoverMosh = now;
-      } else if (hoverPoint && !motion.matches && now - lastHoverMosh >= 125) {
+      } else if (hoverPoint && !motion.matches && now - lastHoverMosh >= CORRUPTION_INTERVAL) {
         paintPoint(hoverPoint, true);
         lastHoverMosh = now;
       } else if (!hoverPoint && !motion.matches && !gpuFailed) paintPoint(livePoint, false);

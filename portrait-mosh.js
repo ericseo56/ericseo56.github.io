@@ -203,7 +203,7 @@ function renderPatch(point, strong, opening = false) {
   if (mode !== nextMode) {
     renderer.applyStepParameterValues({
       [corruptStep]: strong
-        ? { intensity: 100, shift: 85, sort: 45, melt: 25, channelShift: 65, scatter: 0, bits: 10, bandHeight: 18, speed: 2, seed }
+        ? { intensity: 100, shift: 85, sort: 60, melt: 25, channelShift: 90, scatter: 12, bits: 78, bandHeight: 12, speed: 2, seed }
         : opening
           ? { intensity: 55, shift: 65, sort: 25, melt: 0, channelShift: 10, scatter: 0, bits: 0, bandHeight: 7, speed: 2, seed }
           : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },

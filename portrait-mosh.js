@@ -47,8 +47,6 @@ let damaged = false;
 let visible = false;
 let request = 0;
 let lastFrame = 0;
-let automaticEndsAt = 0;
-let livePoint = [0.47, 0.35];
 let seed = 1;
 let mode;
 let historyKey;
@@ -201,7 +199,7 @@ function renderPatch(point, strong, opening = false) {
     mode = historyKey = feedbackReset = undefined;
   }
 
-  const nextMode = `${strong ? 'automatic' : opening ? 'opening' : 'live'}:${seed}`;
+  const nextMode = `${strong ? 'single' : opening ? 'opening' : 'live'}:${seed}`;
   if (mode !== nextMode) {
     renderer.applyStepParameterValues({
       [corruptStep]: strong
@@ -214,8 +212,7 @@ function renderPatch(point, strong, opening = false) {
     });
     mode = nextMode;
   }
-  // Feedback retains corrupted pixels at this location, but starts with fresh
-  // input when the automatic effect moves to a different region.
+  // Each click changes the seed, clearing feedback for its single pass.
   const nextHistory = strong ? `${nextMode}:full` : `${nextMode}:${x}:${y}`;
   const resetHistory = nextHistory !== historyKey;
   if (feedbackReset !== resetHistory) {
@@ -283,7 +280,6 @@ function paintPoint(point, strong) {
     } else pixels.drawImage(patch, 2, 2, source.width - 4, source.height - 4,
       0, 0, working.width, working.height);
     damaged = true;
-    livePoint = point;
     frame.dataset.mosh = 'damaged';
     frame.dataset.hit = 'full';
     showWorking();
@@ -334,18 +330,15 @@ function tick(now) {
   request = 0;
   if (!visible || document.hidden || !portraitReady) return;
   finishIntro(now);
-  if (automaticEndsAt && now >= automaticEndsAt) stopAutomatic();
   const opening = introActive(now);
-  const interval = automaticEndsAt || opening ? frameBudget : Math.max(frameBudget, 1000 / 12);
+  if (!opening) return;
+  const interval = frameBudget;
   if (now - lastFrame >= interval - 1) {
     patchTime += Math.min((now - lastFrame) / 1000, 0.15) / 8;
     lastFrame = now;
     const began = performance.now();
     try {
-      if (automaticEndsAt) {
-        paintPoint([0.5, 0.5], true);
-      } else if (opening) paintIntro();
-      else if (!motion.matches && !gpuFailed) paintPoint(livePoint, false);
+      paintIntro();
     } catch (error) { fallback(error); }
     const cost = performance.now() - began;
     // Back off on slower devices; only process one patch per animation frame.
@@ -365,7 +358,7 @@ function tick(now) {
 function resume() {
   if (!portraitReady || !visible || document.hidden || request) return;
   finishIntro(performance.now());
-  if (!automaticEndsAt && !introActive() && (motion.matches || gpuFailed)) return;
+  if (!introActive()) return;
   request = requestAnimationFrame(tick);
 }
 
@@ -409,38 +402,25 @@ async function initialize() {
   return initPromise;
 }
 
-function stopAutomatic() {
-  automaticEndsAt = 0;
-  frame.dataset.automatic = 'stopped';
-}
-
 trigger.addEventListener('click', () => {
   if (!portraitReady) return;
-  stopAutomatic();
+  stop();
   introEndsAt = 0;
   frame.dataset.intro = 'finished';
   seed = seed % 99 + 1;
-  if (motion.matches) {
-    // An explicit click still corrupts the image without playing an animation.
-    try { paintPoint([0.5, 0.5], true); }
-    catch (error) { fallback(error); }
-    return;
-  }
-  lastFrame = performance.now();
-  automaticEndsAt = lastFrame + 3000;
-  frame.dataset.automatic = 'playing';
-  resume();
+  patchTime += 0.1;
+  // One click applies one full-image pass. No follow-up frames are scheduled.
+  try { paintPoint([0.5, 0.5], true); }
+  catch (error) { fallback(error); }
 });
 frame.addEventListener('dragstart', (event) => event.preventDefault());
 reset.addEventListener('click', () => {
-  stopAutomatic();
   stop();
   introEndsAt = 0;
   frame.dataset.intro = 'finished';
   introSlots.forEach((slot) => { slot.ready = false; });
   damaged = false;
   historyKey = undefined;
-  livePoint = [0.47, 0.35];
   frame.dataset.mosh = 'clean';
   delete frame.dataset.hit;
   if (portraitReady) { drawOriginal(); showWorking(); }
@@ -449,16 +429,15 @@ reset.addEventListener('click', () => {
 new IntersectionObserver(([entry]) => {
   visible = entry.isIntersecting;
   if (visible) initialize().then(resume);
-  else { stopAutomatic(); stop(); }
+  else stop();
 }, { threshold: 0.05 }).observe(frame);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { stopAutomatic(); stop(); }
+  if (document.hidden) stop();
   else { lastFrame = performance.now(); resume(); }
 });
 motion.addEventListener('change', () => {
   stop();
   if (motion.matches) {
-    stopAutomatic();
     if (portraitReady) showWorking();
   }
   resume();

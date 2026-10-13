@@ -48,6 +48,7 @@ let visible = false;
 let request = 0;
 let lastFrame = 0;
 let seed = 1;
+let clickCount = 0;
 let mode;
 let historyKey;
 let feedbackReset;
@@ -181,12 +182,9 @@ function renderPatch(point, strong, opening = false) {
   sourceContext.rect(2, 2, width - 4, height - 4);
   sourceContext.clip();
   if (strong) {
+    // Each pass consumes only the accumulated damage. Reset is the only way
+    // to bring original portrait detail back into the bitmap.
     sourceContext.drawImage(working, 2, 2, width - 4, height - 4);
-    // Feed some original detail back into every full-image pass so repeated
-    // corruption keeps image structure instead of converging to a flat color.
-    sourceContext.globalAlpha = 0.25;
-    sourceContext.drawImage(original, 2, 2, width - 4, height - 4);
-    sourceContext.globalAlpha = 1;
   }
   else sourceContext.drawImage(working, BORDER - x / portraitScale, BORDER - y / portraitScale,
     working.width / portraitScale, working.height / portraitScale);
@@ -201,19 +199,28 @@ function renderPatch(point, strong, opening = false) {
 
   const nextMode = `${strong ? 'single' : opening ? 'opening' : 'live'}:${seed}`;
   if (mode !== nextMode) {
+    // The first few clicks are gentle; later clicks increasingly destroy
+    // structure, with no original-image blend to undo previous passes.
+    const decay = Math.min(1, Math.max(0, (clickCount - 3) / 22));
     renderer.applyStepParameterValues({
       [corruptStep]: strong
-        ? { intensity: 100, shift: 85, sort: 60, melt: 25, channelShift: 90, scatter: 12, bits: 78, bandHeight: 12, speed: 2, seed }
+        ? { intensity: 28 + 62 * decay, shift: 12 + 73 * decay, sort: 14 * decay,
+          melt: 12 * decay, channelShift: 22 + 63 * decay, scatter: 8 * decay,
+          bits: 0, bandHeight: 18 - 10 * decay, speed: 1, seed }
         : opening
           ? { intensity: 55, shift: 65, sort: 25, melt: 0, channelShift: 10, scatter: 0, bits: 0, bandHeight: 7, speed: 2, seed }
           : { intensity: 8, shift: 5, sort: 0, melt: 0, channelShift: 0, scatter: 0, bits: 0, bandHeight: 28, speed: 1, seed },
-      [feedbackStep]: { mix: strong ? 55 : 0 },
+      [feedbackStep]: strong
+        ? { mix: 20 + 25 * decay, scaleAmt: 103 + 5 * decay,
+          rotation: 0.5 + decay, aberration: 25 + 25 * decay, distortion: 2 + 6 * decay }
+        : { mix: 0 },
       [`step_${media.stepIndex}`]: { imageSize: [width, height] }
     });
     mode = nextMode;
   }
-  // Each click changes the seed, clearing feedback for its single pass.
-  const nextHistory = strong ? `${nextMode}:full` : `${nextMode}:${x}:${y}`;
+  // Preserve feedback between clicks so trails inherit the previous damage.
+  // Resize, initialization and Reset invalidate history separately.
+  const nextHistory = strong ? 'full' : `${nextMode}:${x}:${y}`;
   const resetHistory = nextHistory !== historyKey;
   if (feedbackReset !== resetHistory) {
     renderer.applyStepParameterValues({ [feedbackStep]: { resetState: resetHistory } });
@@ -268,7 +275,8 @@ function paintPoint(point, strong) {
       const height = source.height - 4;
       for (let row = 0; row < height; row += 8) {
         const band = Math.min(8, height - row);
-        const shift = Math.round(Math.sin(patchTime * 70 + row * 1.7) * width * 0.12);
+        const decay = Math.min(1, Math.max(0, (clickCount - 3) / 22));
+        const shift = Math.round(Math.sin(patchTime * 70 + row * 1.7) * width * (0.02 + 0.13 * decay));
         const offset = (shift + width) % width;
         const y = row / height * working.height;
         const h = band / height * working.height;
@@ -408,6 +416,8 @@ trigger.addEventListener('click', () => {
   introEndsAt = 0;
   frame.dataset.intro = 'finished';
   seed = seed % 99 + 1;
+  clickCount++;
+  frame.dataset.clicks = String(clickCount);
   patchTime += 0.1;
   // One click applies one full-image pass. No follow-up frames are scheduled.
   try { paintPoint([0.5, 0.5], true); }
@@ -428,7 +438,11 @@ reset.addEventListener('click', () => {
   frame.dataset.intro = 'finished';
   introSlots.forEach((slot) => { slot.ready = false; });
   damaged = false;
-  historyKey = undefined;
+  clickCount = 0;
+  seed = 1;
+  patchTime = 0;
+  mode = historyKey = feedbackReset = undefined;
+  frame.dataset.clicks = '0';
   frame.dataset.mosh = 'clean';
   delete frame.dataset.hit;
   if (portraitReady) { drawOriginal(); showWorking(); }

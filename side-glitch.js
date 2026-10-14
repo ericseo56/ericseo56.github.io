@@ -5,11 +5,18 @@
   const bottomCanvas = document.querySelector('.glitch-bottom');
   const colors = ['#2685ff', '#21e6ef', '#fa397e', '#bd5cff',
     '#ff9347', '#e9e65c', '#68ed9d'];
-  const edges = [...document.querySelectorAll('.glitch-edge')].map((canvas, index) => ({
-    canvas, context: canvas.getContext('2d'), seed: index ? 6197 : 2833, index
-  }));
+  const edges = [...document.querySelectorAll('.glitch-edge')].map((canvas, index) => {
+    const texture = document.createElement('canvas');
+    return { canvas, texture, context: texture.getContext('2d'),
+      seed: index ? 6197 : 2833, index };
+  });
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let resizeRequest = 0;
-  let lastLayout;
+  let paintRequest = 0;
+  let lastEdgeLayout;
+  let lastBottomLayout;
+  let scrollProgress = 0;
+  let lastPaintTime = 0;
 
   function random(seed) {
     let state = seed >>> 0;
@@ -21,12 +28,14 @@
 
   function build(edge, width, height) {
     const density = Math.min(window.devicePixelRatio || 1, 1.5);
-    const { canvas, context } = edge;
-    canvas.style.width = `${width}px`;
+    const { texture: canvas, context } = edge;
+    edge.canvas.style.width = `${width}px`;
+    edge.canvas.width = Math.max(1, Math.round(width * density));
+    edge.canvas.height = Math.round(height * density);
+    edge.canvas.hidden = width < 1;
     canvas.width = Math.max(1, Math.round(width * density));
     canvas.height = Math.round(height * density);
-    canvas.hidden = width < 1;
-    if (canvas.hidden) return;
+    if (edge.canvas.hidden) return;
     context.scale(density, density);
     context.imageSmoothingEnabled = false;
     const rng = random(edge.seed);
@@ -43,7 +52,7 @@
       context.fillRect(edge.index ? width - x - w : x, y, w, h);
     };
     const pickColor = () => colors[Math.floor(rng() * colors.length)];
-    // Independent, uneven pockets advance and retreat inside the same edge bounds.
+    // Cache stable viewport artwork; content expansion never moves or regenerates it.
     const pockets = [];
     for (let y = -180; y < height + 400; y += 140 + rng() * 260) {
       pockets.push({ y, radius: 65 + rng() * 180, strength: 0.25 + rng() * 0.75 });
@@ -55,9 +64,8 @@
       const lowerEdge = Math.max(0, (progress - 0.68) / 0.32);
       const lowerPocket = pocket + 0.16 * lowerEdge * (1 - pocket);
       if (rng() > 0.3 + 0.7 * pocket + 0.14 * lowerEdge) continue;
-      const intensity = Math.min(1, 0.15 + progress * 0.35 + pocket * 0.6);
-      const reach = Math.min(width, (6 + Math.max(0, width - 6) * Math.pow(progress, 0.85))
-        * (0.12 + lowerPocket * 0.88));
+      const intensity = Math.min(1, 0.3 + pocket * 0.6);
+      const reach = width * (0.12 + lowerPocket * 0.88);
       const length = Math.max(1, Math.floor(reach * (0.5 + rng() * 0.5)));
       const blockHeight = Math.floor(5 + rng() * (12 + 30 * intensity));
       const baseColor = pickColor();
@@ -105,6 +113,35 @@
     context.globalAlpha = 1;
   }
 
+  function paint(time) {
+    paintRequest = 0;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const target = maxScroll ? Math.max(0, Math.min(1, window.scrollY / maxScroll)) : 0;
+    const elapsed = Math.max(1, Math.min(64, time - lastPaintTime || 16));
+    lastPaintTime = time;
+    scrollProgress = reducedMotion.matches ? target
+      : scrollProgress + (target - scrollProgress) * (1 - Math.exp(-elapsed / 140));
+    if (Math.abs(target - scrollProgress) < 0.001) scrollProgress = target;
+    const strength = scrollProgress * scrollProgress * (3 - 2 * scrollProgress);
+    for (const edge of edges) {
+      const { canvas, texture } = edge;
+      if (canvas.hidden) continue;
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.imageSmoothingEnabled = false;
+      context.globalAlpha = 0.42 + 0.58 * strength;
+      const reach = canvas.width * (0.22 + 0.78 * strength);
+      context.drawImage(texture, 0, 0, texture.width, texture.height,
+        edge.index ? canvas.width - reach : 0, 0, reach, canvas.height);
+      context.globalAlpha = 1;
+    }
+    if (scrollProgress !== target) schedulePaint();
+  }
+
+  function schedulePaint() {
+    if (!paintRequest) paintRequest = requestAnimationFrame(paint);
+  }
+
   function buildBottom(width, height) {
     const density = Math.min(window.devicePixelRatio || 1, 1.5);
     const context = bottomCanvas.getContext('2d');
@@ -150,6 +187,7 @@
     resizeRequest = 0;
     const bounds = shell.getBoundingClientRect();
     const viewport = document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight;
     const mainBounds = main.getBoundingClientRect();
     const height = Math.ceil(Math.max(window.innerHeight, mainBounds.height));
     const gap = viewport <= 760 ? 12 : viewport <= 1000 ? 16 : 24;
@@ -159,17 +197,25 @@
       element.getBoundingClientRect().bottom - mainBounds.top));
     const bottomHeight = Math.max(0, Math.min(viewport <= 760 ? 64 : 80,
       Math.floor(height - contactBottom - 28)));
-    const layout = [viewport, widths[0], widths[1], height, bottomHeight, window.devicePixelRatio].join(':');
-    if (layout === lastLayout) return;
-    lastLayout = layout;
-    edges.forEach((edge, index) => build(edge, widths[index], height));
-    buildBottom(viewport, bottomHeight);
+    const edgeLayout = [widths[0], widths[1], viewportHeight, window.devicePixelRatio].join(':');
+    if (edgeLayout !== lastEdgeLayout) {
+      lastEdgeLayout = edgeLayout;
+      edges.forEach((edge, index) => build(edge, widths[index], viewportHeight));
+    }
+    const bottomLayout = [viewport, bottomHeight, window.devicePixelRatio].join(':');
+    if (bottomLayout !== lastBottomLayout) {
+      lastBottomLayout = bottomLayout;
+      buildBottom(viewport, bottomHeight);
+    }
+    schedulePaint();
   }
 
   function scheduleResize() {
     if (!resizeRequest) resizeRequest = requestAnimationFrame(resize);
   }
   window.addEventListener('resize', scheduleResize);
+  window.addEventListener('scroll', schedulePaint, { passive: true });
+  reducedMotion.addEventListener('change', schedulePaint);
   new ResizeObserver(scheduleResize).observe(main);
   resize();
 })();

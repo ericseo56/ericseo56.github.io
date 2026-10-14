@@ -1,15 +1,11 @@
 (() => {
   const main = document.querySelector('main');
-  const hero = document.querySelector('.hero');
-  const topLayer = document.querySelector('.top-glitches');
-  const topCanvas = document.querySelector('.glitch-top');
   const contact = document.querySelector('#contact');
   const bottomCanvas = document.querySelector('.glitch-bottom');
   const colors = ['#2685ff', '#21e6ef', '#fa397e', '#bd5cff',
     '#ff9347', '#e9e65c', '#68ed9d'];
   let resizeRequest = 0;
   let lastBottomLayout;
-  let lastTopLayout;
 
   function random(seed) {
     let state = seed >>> 0;
@@ -17,46 +13,6 @@
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
       return state / 4294967296;
     };
-  }
-
-  function buildTop(width, height) {
-    const density = Math.min(window.devicePixelRatio || 1, 1.5);
-    const context = topCanvas.getContext('2d');
-    topLayer.style.height = `${height}px`;
-    topCanvas.style.width = `${width}px`;
-    topCanvas.style.height = `${height}px`;
-    topCanvas.width = Math.max(1, Math.round(width * density));
-    topCanvas.height = Math.max(1, Math.round(height * density));
-    context.scale(density, density);
-    const rng = random(4357);
-    const pickColor = () => colors[Math.floor(rng() * colors.length)];
-    const cluster = (x, y, length, depth, opacity) => {
-      const color = pickColor();
-      for (let row = 0; row < depth; row += 2 + Math.floor(rng() * 5)) {
-        const rowWidth = length * (0.3 + rng() * 0.7);
-        for (let cell = 0; cell < rowWidth; cell += 3 + rng() * 14) {
-          if (rng() < 0.3) continue;
-          const w = Math.min(rowWidth - cell, 2 + rng() * 15);
-          const h = Math.min(depth - row, 1 + Math.floor(rng() * 5));
-          const left = x + cell;
-          context.fillStyle = rng() < 0.55 ? color : pickColor();
-          context.globalAlpha = opacity * (0.5 + rng() * 0.5);
-          context.fillRect(Math.floor(left), Math.floor(y + row), w, h);
-          if (w > 5 && h > 2 && rng() > 0.55) {
-            context.fillStyle = '#171717';
-            context.globalAlpha = 0.9;
-            context.fillRect(Math.floor(left + 1), Math.floor(y + row + 1), w - 3, 1);
-          }
-        }
-      }
-    };
-    // Top fragments live only in the empty space above the hero content.
-    for (let x = -10; x < width; x += 70 + rng() * 220) {
-      const length = Math.min(width - Math.max(0, x), 22 + rng() * 95);
-      const depth = Math.min(height, 5 + Math.pow(rng(), 1.4) * Math.max(0, height - 5));
-      cluster(Math.max(0, x), 0, length, depth, 0.3 + rng() * 0.4);
-    }
-    context.globalAlpha = 1;
   }
 
   function buildBottom(width, height) {
@@ -104,12 +60,6 @@
     resizeRequest = 0;
     const viewport = document.documentElement.clientWidth;
     const mainBounds = main.getBoundingClientRect();
-    const topDepth = Math.max(0, Math.min(48, parseFloat(getComputedStyle(hero).paddingTop) - 20));
-    const topLayout = [viewport, topDepth, window.devicePixelRatio].join(':');
-    if (topLayout !== lastTopLayout) {
-      lastTopLayout = topLayout;
-      buildTop(viewport, topDepth);
-    }
     const height = Math.ceil(Math.max(window.innerHeight, mainBounds.height));
     const contactBottom = Math.max(...[...contact.children].map(element =>
       element.getBoundingClientRect().bottom - mainBounds.top));

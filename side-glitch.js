@@ -1,22 +1,11 @@
 (() => {
-  const shell = document.querySelector('.shell');
   const main = document.querySelector('main');
   const contact = document.querySelector('#contact');
   const bottomCanvas = document.querySelector('.glitch-bottom');
   const colors = ['#2685ff', '#21e6ef', '#fa397e', '#bd5cff',
     '#ff9347', '#e9e65c', '#68ed9d'];
-  const edges = [...document.querySelectorAll('.glitch-edge')].map((canvas, index) => {
-    const texture = document.createElement('canvas');
-    return { canvas, texture, context: texture.getContext('2d'),
-      seed: index ? 6197 : 2833, index };
-  });
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let resizeRequest = 0;
-  let paintRequest = 0;
-  let lastEdgeLayout;
   let lastBottomLayout;
-  let scrollProgress = 0;
-  let lastPaintTime = 0;
 
   function random(seed) {
     let state = seed >>> 0;
@@ -24,122 +13,6 @@
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
       return state / 4294967296;
     };
-  }
-
-  function build(edge, width, height) {
-    const density = Math.min(window.devicePixelRatio || 1, 1.5);
-    const { texture: canvas, context } = edge;
-    edge.canvas.style.width = `${width}px`;
-    edge.canvas.width = Math.max(1, Math.round(width * density));
-    edge.canvas.height = Math.round(height * density);
-    edge.canvas.hidden = width < 1;
-    canvas.width = Math.max(1, Math.round(width * density));
-    canvas.height = Math.round(height * density);
-    if (edge.canvas.hidden) return;
-    context.scale(density, density);
-    context.imageSmoothingEnabled = false;
-    const rng = random(edge.seed);
-    const fragment = (x, y, w, h, color, opacity) => {
-      const right = Math.min(width, x + w);
-      const bottom = Math.min(height, y + h);
-      x = Math.max(0, x);
-      y = Math.max(0, y);
-      w = right - x;
-      h = bottom - y;
-      if (w <= 0 || h <= 0) return;
-      context.fillStyle = color;
-      context.globalAlpha = opacity;
-      context.fillRect(edge.index ? width - x - w : x, y, w, h);
-    };
-    const pickColor = () => colors[Math.floor(rng() * colors.length)];
-    // Cache stable viewport artwork; content expansion never moves or regenerates it.
-    const pockets = [];
-    for (let y = -180; y < height + 400; y += 140 + rng() * 260) {
-      pockets.push({ y, radius: 65 + rng() * 180, strength: 0.25 + rng() * 0.75 });
-    }
-    for (let y = 24 + rng() * 35; y < height; y += 12 + Math.pow(rng(), 1.6) * 100) {
-      const progress = y / height;
-      const pocket = Math.max(0, ...pockets.map(p =>
-        p.strength * Math.pow(Math.max(0, 1 - Math.abs(y - p.y) / p.radius), 0.7)));
-      const lowerEdge = Math.max(0, (progress - 0.68) / 0.32);
-      const lowerPocket = pocket + 0.16 * lowerEdge * (1 - pocket);
-      if (rng() > 0.3 + 0.7 * pocket + 0.14 * lowerEdge) continue;
-      const intensity = Math.min(1, 0.3 + pocket * 0.6);
-      const reach = width * (0.12 + lowerPocket * 0.88);
-      const length = Math.max(1, Math.floor(reach * (0.5 + rng() * 0.5)));
-      const blockHeight = Math.floor(5 + rng() * (12 + 30 * intensity));
-      const baseColor = pickColor();
-      const splitColor = pickColor();
-      const opacity = 0.22 + rng() * 0.2 + 0.4 * intensity;
-      const top = Math.round(y);
-
-      for (let row = 0; row < blockHeight;) {
-        const cellHeight = Math.min(blockHeight - row, 1 + Math.floor(rng() * (3 + 5 * intensity)));
-        const rowEnd = Math.max(1, Math.floor(length * (0.45 + rng() * 0.55)));
-        let x = Math.floor(rng() * Math.min(5, rowEnd));
-        while (x < rowEnd) {
-          const cellWidth = Math.min(rowEnd - x, 2 + Math.floor(rng() * (4 + 19 * intensity)));
-          if (rng() > 0.28) {
-            fragment(x, top + row, cellWidth, cellHeight,
-              rng() > 0.6 ? pickColor() : baseColor, opacity * (0.4 + rng() * 0.6));
-            // Offset color channels make the blocks look torn and misregistered.
-            if (rng() > 0.45) {
-              const shift = 1 + Math.floor(rng() * 4);
-              fragment(x + shift, top + row + cellHeight, Math.min(cellWidth, reach - x - shift),
-                1 + Math.floor(rng() * 2), splitColor, opacity * 0.75);
-            }
-            if (cellWidth > 5 && cellHeight > 2 && rng() > 0.45) {
-              fragment(x + 1, top + row + 1, Math.max(1, cellWidth - 3), 1, '#171717', 0.9);
-            }
-          }
-          x += cellWidth + 1 + Math.floor(rng() * 3);
-        }
-        row += cellHeight + Math.floor(rng() * 3);
-      }
-
-      // Scattered pixel noise and occasional shifted slices break up the grid.
-      for (let pixel = 0; pixel < 4 + Math.floor(18 * intensity); pixel++) {
-        const x = Math.floor(rng() * reach);
-        const size = 1 + Math.floor(rng() * 3);
-        fragment(x, top + Math.floor(rng() * blockHeight), Math.min(size, reach - x),
-          size, pickColor(), opacity * (0.45 + rng() * 0.5));
-      }
-      if (rng() < 0.3 + 0.4 * intensity) {
-        const x = Math.floor(rng() * length * 0.3);
-        fragment(x, top + Math.floor(rng() * blockHeight), length - x, 1,
-          pickColor(), opacity);
-      }
-    }
-    context.globalAlpha = 1;
-  }
-
-  function paint(time) {
-    paintRequest = 0;
-    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    const target = maxScroll ? Math.max(0, Math.min(1, window.scrollY / maxScroll)) : 0;
-    const elapsed = Math.max(1, Math.min(64, time - lastPaintTime || 16));
-    lastPaintTime = time;
-    scrollProgress = reducedMotion.matches ? target
-      : scrollProgress + (target - scrollProgress) * (1 - Math.exp(-elapsed / 140));
-    if (Math.abs(target - scrollProgress) < 0.001) scrollProgress = target;
-    const strength = scrollProgress * scrollProgress * (3 - 2 * scrollProgress);
-    for (const edge of edges) {
-      const { canvas, texture } = edge;
-      if (canvas.hidden) continue;
-      const context = canvas.getContext('2d');
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.imageSmoothingEnabled = false;
-      context.globalAlpha = 0.42 + 0.58 * strength;
-      const reach = canvas.width * (0.22 + 0.78 * strength);
-      context.drawImage(texture, 0, 0, texture.width, texture.height,
-        edge.index ? canvas.width - reach : 0, 0, reach, canvas.height);
-      context.globalAlpha = 1;
-    }
-    if (scrollProgress !== target) schedulePaint();
-  }
-
-  function schedulePaint() {
-    if (!paintRequest) paintRequest = requestAnimationFrame(paint);
   }
 
   function buildBottom(width, height) {
@@ -185,37 +58,24 @@
 
   function resize() {
     resizeRequest = 0;
-    const bounds = shell.getBoundingClientRect();
     const viewport = document.documentElement.clientWidth;
-    const viewportHeight = window.innerHeight;
     const mainBounds = main.getBoundingClientRect();
     const height = Math.ceil(Math.max(window.innerHeight, mainBounds.height));
-    const gap = viewport <= 760 ? 12 : viewport <= 1000 ? 16 : 24;
-    const widths = [bounds.left - gap, viewport - bounds.right - gap]
-      .map(width => Math.max(0, Math.min(180, Math.floor(width))));
     const contactBottom = Math.max(...[...contact.children].map(element =>
       element.getBoundingClientRect().bottom - mainBounds.top));
     const bottomHeight = Math.max(0, Math.min(viewport <= 760 ? 64 : 80,
       Math.floor(height - contactBottom - 28)));
-    const edgeLayout = [widths[0], widths[1], viewportHeight, window.devicePixelRatio].join(':');
-    if (edgeLayout !== lastEdgeLayout) {
-      lastEdgeLayout = edgeLayout;
-      edges.forEach((edge, index) => build(edge, widths[index], viewportHeight));
-    }
     const bottomLayout = [viewport, bottomHeight, window.devicePixelRatio].join(':');
     if (bottomLayout !== lastBottomLayout) {
       lastBottomLayout = bottomLayout;
       buildBottom(viewport, bottomHeight);
     }
-    schedulePaint();
   }
 
   function scheduleResize() {
     if (!resizeRequest) resizeRequest = requestAnimationFrame(resize);
   }
   window.addEventListener('resize', scheduleResize);
-  window.addEventListener('scroll', schedulePaint, { passive: true });
-  reducedMotion.addEventListener('change', schedulePaint);
   new ResizeObserver(scheduleResize).observe(main);
   resize();
 })();

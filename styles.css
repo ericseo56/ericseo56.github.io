@@ -72,6 +72,10 @@ h3 { margin: 0; }
 .project-gallery figcaption { margin-top: 10px; font-size: 12px; line-height: 1.6; }
 .project-photo { display: block; max-width: 520px; }
 .project-photo img { width: 100%; height: auto; }
+.project-photo-dex { width: 100%; max-width: none; margin-inline: auto; }
+.project-photo-olfactory { max-width: 320px; margin-inline: auto; }
+.olfactory-photo { margin: 0; text-align: center; }
+.olfactory-photo figcaption { margin-top: 10px; font-size: 12px; line-height: 1.6; }
 .image-placeholder { width: 100%; aspect-ratio: 3 / 2; min-height: 140px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); color: var(--muted); font-size: 14px; }
 .project-subtitle { font-size: 18px; color: var(--muted); }
 .award { color: var(--accent); margin-top: 10px; }

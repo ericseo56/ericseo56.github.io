@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <title>Eric's Portfolio</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=3">
-  <link rel="stylesheet" href="styles.css?v=31">
+  <link rel="stylesheet" href="styles.css?v=33">
   <script src="expand.js" defer></script>
   <script src="side-glitch.js?v=12" defer></script>
   <script type="module" src="portrait-mosh.js?v=25"></script>
@@ -51,12 +51,25 @@
         </summary>
         <div class="entry-content">
           <p>A recreation of Disney's Holotile system, where tilted tiles rotate under a user's feet to glide them in a specific direction. Previous designs involved intercepting an existing treadmill's power path and controlling its movement directly with a PWM H-bridge. Future work involves making use of CV, pose-tracking, and control of a large swarm of devices to have all these things work in tandem.</p>
-          <div class="image-placeholder" role="img" aria-label="Omnidirectional Treadmill images coming soon"><span>Coming soon!</span></div>
+          <div class="project-gallery">
+            <figure>
+              <a class="project-media patent-diagram" href="assets/holotile-patent.svg" target="_blank" rel="noopener">
+                <img src="assets/holotile-patent.svg" alt="Patent diagram of HoloTile's array of rotating disks and drive motors" width="3084" height="2064" loading="lazy" decoding="async">
+              </a>
+              <figcaption>Disney HoloTile reference · <a href="https://patents.google.com/patent/US10416754B2/en" target="_blank" rel="noopener noreferrer">Patent, Fig. 13</a></figcaption>
+            </figure>
+            <figure>
+              <a class="project-media" href="assets/treadmill-prototype.jpg" target="_blank" rel="noopener">
+                <img src="assets/treadmill-prototype.jpg" alt="Printed treadmill tile prototype with stacked white disks and gray gears on a workbench" width="1485" height="2048" loading="lazy" decoding="async">
+              </a>
+              <figcaption>Our printed tile prototype</figcaption>
+            </figure>
+          </div>
         </div>
       </details>
       <details class="entry">
         <summary class="entry-heading">
-          <span class="entry-meta"><span>Cornell XR</span></span>
+          <span class="entry-meta"><span>Cornell XR</span><span>August 2026 — Present</span></span>
           <h3>Haptic Exoskeleton</h3>
           <span class="entry-indicator" aria-hidden="true"></span>
         </summary>
@@ -67,7 +80,7 @@
       </details>
       <details class="entry">
         <summary class="entry-heading">
-          <span class="entry-meta"><span>Cornell XR</span></span>
+          <span class="entry-meta"><span>Cornell XR</span><span>August 2026 — Present</span></span>
           <h3>Airflow System</h3>
           <span class="entry-indicator" aria-hidden="true"></span>
         </summary>
@@ -84,7 +97,9 @@
         </summary>
         <div class="entry-content">
           <p>Designed DEX, a wearable hand-tracking peripheral for real-time motion sensing and tactile interaction. Built the embedded electronics stack, connecting dual rotary encoders, a 9-DOF IMU, and a thumb switch to an ESP32, with motion data carried over I²C/SPI. Wrote firmware to send calibrated sensor data to a web platform as usable finger-tracking data for rehabilitation and accessibility applications.</p>
-          <div class="image-placeholder" role="img" aria-label="DEX images coming soon"><span>Coming soon!</span></div>
+          <a class="project-photo" href="assets/dex.jpg" target="_blank" rel="noopener">
+            <img src="assets/dex.jpg" alt="DEX wearable hand-tracking prototype with gray finger linkages, sensors, and wiring mounted on a white hand model" width="2752" height="1536" loading="lazy" decoding="async">
+          </a>
         </div>
       </details>
       <details class="entry">
@@ -94,7 +109,9 @@
           <span class="entry-indicator" aria-hidden="true"></span>
         </summary>
         <div class="entry-content">
-          <div class="image-placeholder" role="img" aria-label="Olfactory Display details and images coming soon"><span>Coming soon!</span></div>
+          <a class="project-photo" href="assets/olfactory-display.jpg" target="_blank" rel="noopener">
+            <img src="assets/olfactory-display.jpg" alt="Olfactory display prototype mounted beneath a VR headset, with scent vials on either side" width="654" height="610" loading="lazy" decoding="async">
+          </a>
         </div>
       </details>
     </section>
